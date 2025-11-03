@@ -361,84 +361,81 @@ app.post('/api/employees', async (req, res) => {
       console.log('[api] Sequence creation note:', seqError.message)
     }
 
-    // Get next employee ID with duplicate checking
+    // Get next employee ID by checking existing IDs in database
     let nextEmployeeId: string = ''
-    let attempts = 0
-    const maxAttempts = 10
     
-    while (attempts < maxAttempts) {
-      try {
-        // First, get the max existing numeric ID using PostgreSQL regex
-        const maxResult = await query<{ maxn: number }>(
-          `select coalesce(max((regexp_match(trim(employee_id), '(?i)^EMP\\s*(\\d+)'))[1]::int), 0) as maxn
-           from employees
-           where employee_id ~* '^EMP\\s*\\d+$'`
-        )
-        const maxN = maxResult.rows[0]?.maxn || 0
-
-        // Sync sequence if needed
-        if (maxN > 0) {
-          try {
-            await query(`select setval('employee_numeric_id_seq', $1, true)`, [maxN])
-          } catch (syncError: any) {
-            console.log('[api] Sequence sync note:', syncError.message)
+    try {
+      // Get all existing employee IDs that match the pattern EMP### or EMP## or EMP#
+      const existingIdsResult = await query<{ employee_id: string }>(
+        `select employee_id 
+         from employees 
+         where employee_id ~* '^EMP\\s*\\d+$'
+         order by employee_id desc`
+      )
+      
+      // Extract numeric parts and find the maximum
+      let maxNumericId = 0
+      if (existingIdsResult.rows.length > 0) {
+        for (const row of existingIdsResult.rows) {
+          // Extract numeric part from employee_id (e.g., "EMP003" -> 3)
+          const match = row.employee_id.match(/(\d+)$/)
+          if (match && match[1]) {
+            const numericPart = parseInt(match[1], 10)
+            if (!isNaN(numericPart) && numericPart > maxNumericId) {
+              maxNumericId = numericPart
+            }
           }
         }
-
-        // Get next value from sequence
-        const nextResult = await query<{ nextval: number }>(`select nextval('employee_numeric_id_seq') as nextval`)
-        let nextNum = nextResult.rows[0]?.nextval || maxN + 1
+      }
+      
+      // Generate next ID: maxNumericId + 1
+      let nextNumericId = maxNumericId + 1
+      nextEmployeeId = 'EMP' + String(nextNumericId).padStart(3, '0')
+      
+      // Double-check if this ID already exists (safety check - should not happen)
+      const existsCheck = await query<{ count: string }>(
+        `select count(*)::text as count from employees where employee_id = $1`,
+        [nextEmployeeId]
+      )
+      
+      // If it exists (edge case), increment until we find an available one
+      let attempts = 0
+      while (existsCheck.rows[0]?.count !== '0' && attempts < 10) {
+        console.log(`[api] Employee ID ${nextEmployeeId} already exists, trying next...`)
+        nextNumericId++
+        nextEmployeeId = 'EMP' + String(nextNumericId).padStart(3, '0')
         
-        // If sequence returned a value less than or equal to max, increment it
-        if (nextNum <= maxN) {
-          nextNum = maxN + 1
-          // Update sequence to reflect this
-          try {
-            await query(`select setval('employee_numeric_id_seq', $1, true)`, [nextNum])
-          } catch (e) {
-            // Ignore
-          }
-        }
-        
-        nextEmployeeId = 'EMP' + String(nextNum).padStart(3, '0')
-        
-        // Check if this ID already exists (safety check)
-        const existsCheck = await query<{ count: string }>(
+        const recheck = await query<{ count: string }>(
           `select count(*)::text as count from employees where employee_id = $1`,
           [nextEmployeeId]
         )
         
-        if (existsCheck.rows[0]?.count === '0') {
-          // ID is available, break out of loop
+        if (recheck.rows[0]?.count === '0') {
           break
-        } else {
-          // ID exists, try again with incremented number
-          console.log(`[api] Employee ID ${nextEmployeeId} already exists, trying next...`)
-          attempts++
-          if (attempts >= maxAttempts) {
-            throw new Error('Failed to generate unique employee ID after multiple attempts')
-          }
-          // Force increment and continue - update sequence and try again
-          try {
-            await query(`select setval('employee_numeric_id_seq', $1, true)`, [nextNum + 1])
-          } catch (e) {
-            // Ignore
-          }
-          continue
         }
-      } catch (idError: any) {
         attempts++
-        if (attempts >= maxAttempts) {
-          console.error('[api] Error generating employee ID after retries:', idError.message)
-          // Final fallback: generate ID based on count + timestamp
-          const countResult = await query<{ count: string }>(`select count(*)::text as count from employees`)
-          const count = parseInt(countResult.rows[0]?.count || '0', 10)
-          const timestamp = Date.now().toString().slice(-4) // Last 4 digits of timestamp
-          nextEmployeeId = 'EMP' + String(count + 1).padStart(3, '0') + timestamp.slice(-2)
-          break
-        }
-        console.error('[api] Error generating employee ID (attempt ' + attempts + '):', idError.message)
       }
+      
+      if (attempts >= 10) {
+        throw new Error('Failed to find unique employee ID after checking database')
+      }
+      
+      // Sync sequence for future use
+      try {
+        await query(`select setval('employee_numeric_id_seq', $1, true)`, [nextNumericId])
+      } catch (seqError: any) {
+        // Ignore if sequence doesn't exist or similar
+        console.log('[api] Sequence sync note:', seqError.message)
+      }
+      
+      console.log(`[api] Generated employee ID: ${nextEmployeeId} (from max existing: ${maxNumericId})`)
+    } catch (idError: any) {
+      console.error('[api] Error generating employee ID:', idError.message)
+      // Fallback: generate ID based on count
+      const countResult = await query<{ count: string }>(`select count(*)::text as count from employees`)
+      const count = parseInt(countResult.rows[0]?.count || '0', 10)
+      nextEmployeeId = 'EMP' + String(count + 1).padStart(3, '0')
+      console.log(`[api] Using fallback employee ID: ${nextEmployeeId}`)
     }
     
     if (!nextEmployeeId) {
