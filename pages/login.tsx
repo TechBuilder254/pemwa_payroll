@@ -1,10 +1,9 @@
-import { useState } from 'react'
-import { useRouter } from 'next/router'
+import { useState, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { 
   Mail, 
   Lock, 
@@ -12,9 +11,11 @@ import {
   EyeOff, 
   ArrowRight,
   Shield,
-  Building2
+  Building2,
+  AlertCircle
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { login } from '@/lib/api'
+import { useAuth } from '@/contexts/auth-context'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -22,54 +23,44 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const router = useRouter()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { isAuthenticated, login: setAuthUser, isLoading: isAuthLoading } = useAuth()
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!isAuthLoading && isAuthenticated) {
+      const from = (location.state as any)?.from?.pathname || '/'
+      navigate(from, { replace: true })
+    }
+  }, [isAuthenticated, isAuthLoading, navigate, location])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) {
-        setError(error.message)
-        return
-      }
-
-      if (data.user) {
-        router.push('/')
-      }
-    } catch (err) {
-      setError('An unexpected error occurred. Please try again.')
-    } finally {
+    // Basic validation
+    if (!email || !password) {
+      setError('Please enter both email and password')
       setIsLoading(false)
-    }
-  }
-
-  const handlePasswordReset = async () => {
-    if (!email) {
-      setError('Please enter your email address first')
       return
     }
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      })
+      const response = await login({ email, password })
 
-      if (error) {
-        setError(error.message)
-      } else {
-        setError('')
-        // Show success message
-        alert('Password reset email sent! Check your inbox.')
+      if (response.user) {
+        // Update auth context
+        setAuthUser(response.user)
+        // Redirect to dashboard or the page they were trying to access
+        const from = (location.state as any)?.from?.pathname || '/'
+        navigate(from, { replace: true })
       }
-    } catch (err) {
-      setError('Failed to send password reset email')
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred. Please try again.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -143,7 +134,8 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20">
+                <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 flex items-start gap-2 animate-in fade-in slide-in-from-top-2">
+                  <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-destructive">{error}</p>
                 </div>
               )}
@@ -167,15 +159,6 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <div className="text-center">
-              <Button
-                variant="link"
-                onClick={handlePasswordReset}
-                className="text-sm text-muted-foreground hover:text-primary"
-              >
-                Forgot your password?
-              </Button>
-            </div>
           </CardContent>
         </Card>
 

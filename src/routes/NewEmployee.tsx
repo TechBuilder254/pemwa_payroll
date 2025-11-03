@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNextEmployeeId } from '@/hooks/useNextEmployeeId'
 import { useSidebar } from '@/contexts/sidebar-context'
 import { useToast } from '@/hooks/use-toast'
@@ -28,6 +29,7 @@ function AllowanceField({ label, value, onChange, placeholder = '0' }: { label: 
 
 function EmployeeForm() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { toast } = useToast()
   const { data: nextEmployeeId } = useNextEmployeeId()
   const [formData, setFormData] = useState<EmployeeFormData>(initialFormData)
@@ -67,6 +69,13 @@ function EmployeeForm() {
         voluntary_deductions: formData.voluntary_deductions as any,
         // optional fields can be saved in dedicated tables/JSON if schema supports
       } as any)
+      
+      // Invalidate and refetch employees query immediately
+      await queryClient.invalidateQueries({ queryKey: ['employees'] })
+      await queryClient.refetchQueries({ queryKey: ['employees'], type: 'active' })
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      await queryClient.refetchQueries({ queryKey: ['dashboard-stats'], type: 'active' })
+      
       toast({ title: 'Success!', description: 'Employee has been saved successfully.', className: 'bg-green-600 text-white border-green-700' })
       setTimeout(() => navigate('/employees'), 500)
     } catch (error: any) {

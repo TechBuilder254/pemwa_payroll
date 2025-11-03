@@ -15,14 +15,12 @@ import {
   MoreHorizontal,
   Edit,
   Eye,
-  Building2,
-  Calculator,
-  ChevronDown,
-  ChevronUp
+  Users,
+  Building2
 } from 'lucide-react'
-import { formatCurrency, calculatePayroll } from '@/lib/payroll-calculations'
+import { motion } from 'framer-motion'
+import { formatCurrency } from '@/lib/payroll-calculations'
 import { useEmployees } from '@/hooks/useEmployees'
-import { usePayrollSettings } from '@/hooks/usePayrollSettings'
 import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/use-toast'
 
@@ -47,64 +45,56 @@ const EmployeesTableDynamic = dynamic(
   }
 )
 
-function EmployeeCard({ employee, settings }: { employee: any; settings: any }) {
+function EmployeeCard({ employee, onView, onEdit, onDelete }: { 
+  employee: any
+  onView: (e: any) => void
+  onEdit: (e: any) => void
+  onDelete: (e: any) => void
+}) {
   const { shouldExpand } = useSidebar()
-  const [showCalculations, setShowCalculations] = useState(false)
   
   const totalAllowances: number = Object.values(employee.allowances as Record<string, number | undefined>).reduce(
     (sum: number, amount: number | undefined) => sum + (amount || 0),
     0
   )
-  const totalVoluntaryDeductions: number = Object.values(employee.voluntary_deductions as Record<string, number | undefined>).reduce(
-    (sum: number, amount: number | undefined) => sum + (amount || 0),
-    0
-  )
   const grossSalary: number = employee.basic_salary + totalAllowances
-  
-  const calculation = calculatePayroll(
-    {
-      id: employee.id,
-      basic_salary: employee.basic_salary,
-      helb_amount: employee.helb_amount,
-    } as any,
-    employee.allowances as any,
-    employee.voluntary_deductions as any,
-    0, // bonuses
-    0, // overtime
-    settings as any
-  )
 
   return (
-    <Card className={cn(
-      "hover:shadow-md transition-all duration-200 group overflow-hidden min-w-0",
-      shouldExpand ? "sm:p-3" : "sm:p-4"
-    )}>
-      <CardHeader className="pb-3 min-w-0">
-        <div className="flex items-start justify-between min-w-0">
-          <div className="flex items-center space-x-3 min-w-0 flex-1">
-            <div className="kenya-gradient w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-bold text-lg">
-                {employee.name.split(' ').map((n: string) => n[0]).join('')}
-              </span>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <Card className={cn(
+        "hover:shadow-lg transition-all duration-200 group overflow-hidden min-w-0 border-2",
+        shouldExpand ? "sm:p-3" : "sm:p-4"
+      )}>
+        <CardHeader className="pb-3 min-w-0 bg-gradient-to-r from-primary/5 to-primary/10 border-b">
+          <div className="flex items-start justify-between min-w-0">
+            <div className="flex items-center space-x-3 min-w-0 flex-1">
+              <div className="kenya-gradient w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                <span className="text-white font-bold text-base">
+                  {employee.name.split(' ').map((n: string) => n[0]).join('')}
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <CardTitle className={cn(
+                  "transition-all duration-300 truncate text-slate-900 dark:text-foreground",
+                  shouldExpand ? "sm:text-base" : "sm:text-lg"
+                )} title={employee.name}>{employee.name}</CardTitle>
+                <CardDescription className={cn(
+                  "transition-all duration-300 truncate",
+                  shouldExpand ? "sm:text-xs" : "sm:text-sm"
+                )} title={`${employee.position} • ${employee.employee_id}`}>
+                  {employee.position} • {employee.employee_id}
+                </CardDescription>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <CardTitle className={cn(
-                "transition-all duration-300 truncate",
-                shouldExpand ? "sm:text-base" : "sm:text-lg"
-              )} title={employee.name}>{employee.name}</CardTitle>
-              <CardDescription className={cn(
-                "transition-all duration-300 truncate",
-                shouldExpand ? "sm:text-xs" : "sm:text-sm"
-              )} title={`${employee.position} • ${employee.employee_id}`}>
-                {employee.position} • {employee.employee_id}
-              </CardDescription>
-            </div>
+            <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
           </div>
-          <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
+        </CardHeader>
       <CardContent className="pt-0 min-w-0">
         <div className="space-y-3">
           <div className="flex justify-between items-center min-w-0">
@@ -119,116 +109,13 @@ function EmployeeCard({ employee, settings }: { employee: any; settings: any }) 
             <span className="text-sm text-muted-foreground truncate">Gross Salary</span>
             <span className="font-semibold text-primary truncate ml-2" title={formatCurrency(grossSalary)}>{formatCurrency(grossSalary)}</span>
           </div>
-          
-          {/* Net Salary Preview */}
-          <div className="flex justify-between items-center min-w-0 pt-1 border-t">
-            <span className="text-sm font-medium truncate">Net Salary</span>
-            <span className="font-bold text-green-600 truncate ml-2" title={formatCurrency(calculation.netSalary)}>{formatCurrency(calculation.netSalary)}</span>
-          </div>
-          
-          {/* Show Calculations Toggle */}
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="w-full mt-2 text-xs"
-            onClick={() => setShowCalculations(!showCalculations)}
-          >
-            <Calculator className="h-3.5 w-3.5 mr-1" />
-            {showCalculations ? 'Hide' : 'Show'} Calculations
-            {showCalculations ? <ChevronUp className="h-3.5 w-3.5 ml-1" /> : <ChevronDown className="h-3.5 w-3.5 ml-1" />}
-          </Button>
-
-          {/* Detailed Calculations */}
-          {showCalculations && (
-            <div className="pt-3 mt-3 border-t space-y-2 bg-muted/30 rounded-lg p-3">
-              <div className="text-xs font-semibold mb-2 flex items-center gap-1">
-                <Calculator className="h-3 w-3" />
-                Payroll Breakdown
-              </div>
-              
-              {/* Statutory Deductions */}
-              <div className="space-y-1.5">
-                <div className="text-[11px] font-medium text-muted-foreground">Statutory Deductions:</div>
-                <div className="flex justify-between text-[11px] pl-2">
-                  <span>NSSF (Employee)</span>
-                  <span className="font-medium">{formatCurrency(calculation.nssfEmployee)}</span>
-                </div>
-                <div className="flex justify-between text-[11px] pl-2">
-                  <span>SHIF (Employee)</span>
-                  <span className="font-medium">{formatCurrency(calculation.shifEmployee)}</span>
-                </div>
-                <div className="flex justify-between text-[11px] pl-2">
-                  <span>AHL (Employee)</span>
-                  <span className="font-medium">{formatCurrency(calculation.ahlEmployee)}</span>
-                </div>
-                <div className="flex justify-between text-[11px] pl-2">
-                  <span>PAYE</span>
-                  <span className="font-medium">{formatCurrency(calculation.payeAfterRelief)}</span>
-                </div>
-                {calculation.helb > 0 && (
-                  <div className="flex justify-between text-[11px] pl-2">
-                    <span>HELB</span>
-                    <span className="font-medium">{formatCurrency(calculation.helb)}</span>
-                  </div>
-                )}
-                {calculation.voluntaryDeductionsTotal > 0 && (
-                  <div className="flex justify-between text-[11px] pl-2">
-                    <span>Voluntary Deductions</span>
-                    <span className="font-medium">{formatCurrency(calculation.voluntaryDeductionsTotal)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-[11px] font-semibold pt-1 border-t mt-1">
-                  <span>Total Deductions</span>
-                  <span className="text-red-600">{formatCurrency(calculation.totalDeductions)}</span>
-                </div>
-              </div>
-
-              {/* Employer Costs */}
-              <div className="space-y-1.5 pt-2 border-t mt-2">
-                <div className="text-[11px] font-medium text-muted-foreground">Employer Contributions:</div>
-                <div className="flex justify-between text-[11px] pl-2">
-                  <span>NSSF (Employer)</span>
-                  <span className="font-medium">{formatCurrency(calculation.nssfEmployer)}</span>
-                </div>
-                <div className="flex justify-between text-[11px] pl-2">
-                  <span>SHIF (Employer)</span>
-                  <span className="font-medium">{formatCurrency(calculation.shifEmployer)}</span>
-                </div>
-                <div className="flex justify-between text-[11px] pl-2">
-                  <span>AHL (Employer)</span>
-                  <span className="font-medium">{formatCurrency(calculation.ahlEmployer)}</span>
-                </div>
-                <div className="flex justify-between text-[11px] font-semibold pt-1 border-t mt-1">
-                  <span>Total Employer Cost</span>
-                  <span className="text-blue-600">{formatCurrency(calculation.totalEmployerCost)}</span>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {(employee.helb_amount > 0 || totalVoluntaryDeductions > 0) && (
-            <div className="pt-2 border-t">
-              {employee.helb_amount > 0 && (
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs text-muted-foreground">HELB</span>
-                  <span className="text-xs">{formatCurrency(employee.helb_amount)}</span>
-                </div>
-              )}
-              {totalVoluntaryDeductions > 0 && (
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-muted-foreground">Voluntary Deductions</span>
-                  <span className="text-xs">{formatCurrency(totalVoluntaryDeductions)}</span>
-                </div>
-              )}
-            </div>
-          )}
 
           <div className="flex gap-2 pt-2">
-            <Button size="sm" variant="outline" className="flex-1">
+            <Button size="sm" variant="outline" className="flex-1" onClick={() => onView(employee)}>
               <Eye className="h-4 w-4 mr-1" />
               View
             </Button>
-            <Button size="sm" variant="outline" className="flex-1">
+            <Button size="sm" variant="outline" className="flex-1" onClick={() => onEdit(employee)}>
               <Edit className="h-4 w-4 mr-1" />
               Edit
             </Button>
@@ -236,6 +123,7 @@ function EmployeeCard({ employee, settings }: { employee: any; settings: any }) 
         </div>
       </CardContent>
     </Card>
+    </motion.div>
   )
 }
 
@@ -282,9 +170,6 @@ export default function Employees() {
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const { data: employees, isLoading: isEmployeesLoading } = useEmployees()
-  const { data: settings, isLoading: isSettingsLoading } = usePayrollSettings()
-
-  const isLoading = isEmployeesLoading || isSettingsLoading
 
   const filteredEmployees = useMemo(() => {
     const list = employees ?? []
@@ -296,22 +181,64 @@ export default function Employees() {
   }, [employees, searchTerm])
 
   return (
-    <div className="min-h-screen bg-background w-full overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 w-full overflow-x-hidden">
+      {/* Mobile Header */}
+      <div className="sm:hidden px-4 py-6 border-b bg-card/80 backdrop-blur-sm">
+        <div className="flex items-center justify-between min-w-0">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-bold truncate">Employees</h1>
+            <p className="text-[12px] text-muted-foreground truncate">Manage your team</p>
+          </div>
+          <div className="kenya-gradient w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ml-2 shadow-lg">
+            <Users className="h-5 w-5 text-white" />
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Header */}
+      <div className={cn(
+        "hidden sm:block px-4 sm:px-6 py-6 border-b bg-card/80 backdrop-blur-sm transition-all duration-300",
+        shouldExpand ? "sm:px-4" : "sm:px-6"
+      )}>
+        <div className="flex items-center justify-between min-w-0">
+          <div className="min-w-0 flex-1">
+            <h1 className={cn(
+              "font-bold transition-all duration-300",
+              shouldExpand ? "text-xl" : "text-2xl"
+            )}>
+              Employees
+            </h1>
+            <p className={cn(
+              "text-muted-foreground transition-all duration-300 mt-1",
+              shouldExpand ? "text-xs" : "text-sm"
+            )}>
+              Manage your team and employee information
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="kenya-gradient w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ml-4 shadow-lg">
+              <Users className="h-6 w-6 text-white" />
+            </div>
+            <Button 
+              className="kenya-gradient text-white hover:opacity-90 flex-shrink-0 shadow-lg"
+              onClick={() => router.push('/employees/new')}
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Add Employee
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {/* Main Content */}
       <div className={cn(
         "w-full min-w-0 space-y-6 transition-all duration-300",
-        "p-4 sm:p-6",
-        shouldExpand ? "sm:px-4" : "sm:px-6"
+        "p-4 sm:p-6"
       )}>
-        {/* Page Toolbar (below global header) */}
-        <div className="flex items-center justify-between min-w-0 mb-2 sm:mb-4">
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold truncate">Employees</h2>
-            <p className="text-[12px] text-muted-foreground truncate">Manage your team</p>
-          </div>
+        {/* Mobile Add Button */}
+        <div className="sm:hidden flex justify-end">
           <Button 
-            className="kenya-gradient text-white hover:opacity-90 flex-shrink-0 ml-4"
-            size="sm"
+            className="kenya-gradient text-white hover:opacity-90 shadow-lg"
             onClick={() => router.push('/employees/new')}
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -319,66 +246,89 @@ export default function Employees() {
           </Button>
         </div>
         {/* Search and Stats */}
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search employees..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Badge variant="secondary" className="text-sm">
-              {filteredEmployees.length} employees
-            </Badge>
-            <Badge variant="outline" className="text-sm">
-              Total: {formatCurrency((employees ?? []).reduce((sum, emp) => {
-                const allowances = Object.values(emp.allowances).reduce((a, b) => a + (b || 0), 0)
-                return sum + emp.basic_salary + allowances
-              }, 0))}
-            </Badge>
-          </div>
-        </div>
+        <Card className="border-2 bg-card/50">
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search employees..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 border-2"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Badge variant="secondary" className="text-sm px-3 py-1">
+                  {filteredEmployees.length} employees
+                </Badge>
+                <Badge variant="outline" className="text-sm px-3 py-1">
+                  Total: {formatCurrency((employees ?? []).reduce((sum, emp) => {
+                    const allowances = Object.values(emp.allowances).reduce((a, b) => a + (b || 0), 0)
+                    return sum + emp.basic_salary + allowances
+                  }, 0))}
+                </Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Mobile Cards */}
         <div className={cn(
           "sm:hidden space-y-4",
           shouldExpand ? "sm:space-y-3" : "sm:space-y-4"
         )}>
-          {isLoading ? (
+          {isEmployeesLoading ? (
             <EmployeesSkeleton />
           ) : (
             filteredEmployees.map((employee) => (
-              <EmployeeCard key={employee.id} employee={employee} settings={settings} />
+              <EmployeeCard 
+                key={employee.id} 
+                employee={employee}
+                onView={(e) => router.push(`/employees/${e.id}`)}
+                onEdit={(e) => router.push(`/employees/${e.id}`)}
+                onDelete={async (e) => {
+                  if (!confirm(`Delete ${e.name} (${e.employee_id})? This cannot be undone.`)) return
+                  try {
+                    const res = await fetch(`/api/employees/${e.id}`, { method: 'DELETE' })
+                    if (!res.ok) throw new Error((await res.json()).error || 'Failed to delete')
+                    toast({ title: 'Employee deleted', description: `${e.name} removed.` })
+                    await queryClient.invalidateQueries({ queryKey: ['employees'] })
+                    await queryClient.refetchQueries({ queryKey: ['employees'], type: 'active' })
+                    await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+                    await queryClient.refetchQueries({ queryKey: ['dashboard-stats'], type: 'active' })
+                  } catch (err: any) {
+                    toast({ title: 'Delete failed', description: err?.message || 'Could not delete employee', variant: 'destructive' })
+                  }
+                }}
+              />
             ))
           )}
         </div>
 
         {/* Desktop Table (deferred) */}
-        {settings && (
-          <EmployeesTableDynamic 
-            employees={filteredEmployees as any}
-            settings={settings as any}
-            onView={(e: any) => router.push(`/employees/${e.id}`)}
-            onEdit={(e: any) => router.push(`/employees/${e.id}`)}
-            onDelete={async (e: any) => {
+        <EmployeesTableDynamic 
+          employees={filteredEmployees as any}
+          onView={(e: any) => router.push(`/employees/${e.id}`)}
+          onEdit={(e: any) => router.push(`/employees/${e.id}`)}
+          onDelete={async (e: any) => {
               if (!confirm(`Delete ${e.name} (${e.employee_id})? This cannot be undone.`)) return
               try {
                 const res = await fetch(`/api/employees/${e.id}`, { method: 'DELETE' })
                 if (!res.ok) throw new Error((await res.json()).error || 'Failed to delete')
                 toast({ title: 'Employee deleted', description: `${e.name} removed.` })
                 await queryClient.invalidateQueries({ queryKey: ['employees'] })
+                await queryClient.refetchQueries({ queryKey: ['employees'], type: 'active' })
+                await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+                await queryClient.refetchQueries({ queryKey: ['dashboard-stats'], type: 'active' })
               } catch (err: any) {
                 toast({ title: 'Delete failed', description: err?.message || 'Could not delete employee', variant: 'destructive' })
               }
             }}
           />
-        )}
 
         {/* Empty State */}
-        {filteredEmployees.length === 0 && !isLoading && (
+        {filteredEmployees.length === 0 && !isEmployeesLoading && (
           <Card className="text-center py-12">
             <CardContent>
               <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

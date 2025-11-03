@@ -47,43 +47,41 @@
 - Remit all statutory contributions monthly (by 9th of following month)
 - Maintain accurate payroll records
 - Generate annual P9 forms for each employee
-- Pay WIBA (Work Injury Benefits) and other mandatory contributions
+- Comply with all mandatory statutory deductions
 
-## Database Schema (Supabase)
+## Database Schema (PostgreSQL)
 
 ### Tables
 1. **employees**
-   - id, org_id, created_by, created_at, updated_at
-   - name, employee_id, kra_pin, position
-   - basic_salary, allowances (JSON), sha, housing_levy_percent
-   - helb_amount, voluntary_deductions (JSON)
+   - id (uuid), name, employee_id, kra_pin, position
+   - basic_salary, allowances (JSON), helb_amount
+   - voluntary_deductions (JSON), created_at, updated_at
 
 2. **payroll_settings**
-   - id, org_id, created_by, created_at, effective_from, effective_to, is_active
+   - id (uuid), created_at, effective_from, effective_to, is_active
    - personal_relief, nssf_employee_rate, nssf_employer_rate
-   - shif_employee_rate, shif_employer_rate
-   - ahl_employee_rate, ahl_employer_rate
-   - wiba_rate, paye_brackets (JSON array)
+   - nssf_max_contribution, shif_employee_rate, shif_employer_rate
+   - ahl_employee_rate, ahl_employer_rate, paye_brackets (JSON array)
 
-3. **payroll** (monthly records)
-   - id, org_id, employee_id, month, created_by, created_at
+3. **payroll_records** (monthly records)
+   - id (uuid), employee_id, month, created_at
    - gross_salary, basic_salary, allowances_total, overtime, bonuses
-   - nssf_employee, nssf_employer
-   - shif_employee, shif_employer
-   - ahl_employee, ahl_employer
-   - helb, voluntary_deductions_total
+   - nssf_employee, nssf_employer, shif_employee, shif_employer
+   - ahl_employee, ahl_employer, helb, voluntary_deductions_total
    - paye_before_relief, personal_relief, paye_after_relief
-   - total_deductions, net_salary
-   - wiba, total_employer_cost
+   - total_deductions, net_salary, total_employer_cost
 
-4. **p9** (annual summaries)
-   - id, org_id, employee_id, year, created_by, created_at
+4. **p9_records** (annual summaries)
+   - id (uuid), employee_id, year, created_at
    - gross_salary_total, basic_salary_total, allowances_total
    - nssf_employee_total, nssf_employer_total
    - shif_employee_total, shif_employer_total
    - ahl_employee_total, ahl_employer_total
    - helb_total, voluntary_deductions_total
    - paye_total, net_salary_total, total_employer_cost
+
+5. **payroll_runs** (batch processing tracking)
+   - id (uuid), period_month (date), created_by, notes, created_at
 
 ## Application Pages & Flows
 
@@ -104,7 +102,6 @@
 - **SHIF Rates**: 2.75% default, configurable
 - **AHL Rates**: 1.5% default, configurable
 - **Personal Relief**: KES 2,400 default
-- **WIBA Rate**: Configurable employer contribution
 - **Version Control**: Save new active settings
 
 ### 4. Employee Management (`/employees`)
@@ -141,13 +138,14 @@ gross_salary = basic_salary + allowances_total + overtime + bonuses
 
 ### Statutory Deductions
 ```
-nssf_employee = min(gross_salary * nssf_rate, 4320)
-nssf_employer = min(gross_salary * nssf_rate, 4320)
-shif_employee = gross_salary * 0.0275
-shif_employer = gross_salary * 0.0275
-ahl_employee = gross_salary * 0.015
-ahl_employer = gross_salary * 0.015
+nssf_employee = min(gross_salary * nssf_employee_rate, nssf_max_contribution)
+nssf_employer = min(gross_salary * nssf_employer_rate, nssf_max_contribution)
+shif_employee = gross_salary * shif_employee_rate
+shif_employer = gross_salary * shif_employer_rate
+ahl_employee = gross_salary * ahl_employee_rate
+ahl_employer = gross_salary * ahl_employer_rate
 ```
+*Note: All rates are fetched from the payroll_settings table in the database*
 
 ### Taxable Income & PAYE
 ```
@@ -161,8 +159,7 @@ paye_after_relief = max(paye_before_relief - personal_relief, 0)
 total_deductions = nssf_employee + shif_employee + ahl_employee + 
                    helb + voluntary_deductions + paye_after_relief
 net_salary = gross_salary - total_deductions
-total_employer_cost = gross_salary + nssf_employer + shif_employer + 
-                       ahl_employer + wiba
+total_employer_cost = gross_salary + nssf_employer + shif_employer + ahl_employer
 ```
 
 ## Mobile vs Desktop Design

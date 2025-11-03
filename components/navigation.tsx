@@ -2,12 +2,12 @@
 
 import * as React from "react"
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
-import { Menu, X, Users, Calculator, FileText, BarChart3, Settings, ChevronLeft, ChevronRight, Building2 } from "lucide-react"
+import { Menu, X, Users, Calculator, FileText, BarChart3, Settings, ChevronLeft, ChevronRight, Building2, LogOut } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { useSidebar } from "@/contexts/sidebar-context"
+import { useAuth } from "@/contexts/auth-context"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: BarChart3 },
@@ -21,23 +21,39 @@ const navigation = [
 
 export function Navigation() {
   const [isOpen, setIsOpen] = React.useState(false)
+  const [isMobile, setIsMobile] = React.useState(true) // Default to mobile for SSR
   const { isCollapsed, isPinned, isHovered, shouldExpand, setIsCollapsed, setIsPinned, setIsHovered } = useSidebar()
+  const { logout } = useAuth()
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false)
   const location = useLocation()
   const pathname = location.pathname
   const prefersReducedMotion = useReducedMotion()
+
+  // Detect mobile on client side (after mount)
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640) // 640px is Tailwind's sm breakpoint
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   const sidebarWidth = shouldExpand ? "w-64" : "w-16"
 
   return (
     <>
       {/* Mobile Navigation */}
-      <nav className="sm:hidden fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+      <nav className="sm:hidden fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-xl border-b-2 border-border/50 shadow-lg">
         <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center space-x-2">
-            <div className="kenya-gradient w-8 h-8 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">P</span>
+          <div className="flex items-center space-x-3">
+            <div className="kenya-gradient w-10 h-10 rounded-xl flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-base">P</span>
             </div>
-            <span className="font-semibold text-lg">Pemwa Payroll</span>
+            <div>
+              <span className="font-bold text-base text-slate-900 dark:text-foreground">Pemwa Payroll</span>
+              <p className="text-[10px] text-slate-600 dark:text-muted-foreground">Kenyan Payroll</p>
+            </div>
           </div>
           <Button
             variant="ghost"
@@ -78,12 +94,15 @@ export function Navigation() {
               >
                 <div className="flex flex-col h-full">
                   {/* Header */}
-                  <div className="flex items-center justify-between px-3 py-3 border-b pt-12">
-                    <div className="flex items-center space-x-2">
-                      <div className="kenya-gradient w-8 h-8 rounded-lg flex items-center justify-center">
-                        <span className="text-white font-bold text-sm">P</span>
+                  <div className="flex items-center justify-between px-4 py-4 border-b border-border/50 pt-14 bg-gradient-to-r from-primary/5 to-primary/10">
+                    <div className="flex items-center space-x-3">
+                      <div className="kenya-gradient w-10 h-10 rounded-xl flex items-center justify-center shadow-lg">
+                        <span className="text-white font-bold text-base">P</span>
                       </div>
-                      <span className="font-semibold text-lg">Pemwa Payroll</span>
+                      <div>
+                        <span className="font-bold text-base text-slate-900 dark:text-foreground">Pemwa Payroll</span>
+                        <p className="text-[10px] text-slate-600 dark:text-muted-foreground">Kenyan Payroll</p>
+                      </div>
                     </div>
                     <Button
                       variant="ghost"
@@ -97,7 +116,7 @@ export function Navigation() {
                   </div>
                   
                   {/* Navigation Items */}
-                  <div className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
+                  <div className="flex-1 px-3 py-4 space-y-2 overflow-y-auto">
                     {navigation.map((item) => {
                       const Icon = item.icon
                       const isActive = pathname === item.href
@@ -108,10 +127,10 @@ export function Navigation() {
                           to={item.href}
                           onClick={() => setIsOpen(false)}
                           className={cn(
-                            "flex items-center space-x-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors",
+                            "flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-300 border",
                             isActive
-                              ? "bg-primary text-primary-foreground"
-                              : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                              ? "bg-gradient-to-r from-primary via-primary to-primary/90 text-primary-foreground shadow-lg border-primary/50"
+                              : "text-slate-700 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-foreground hover:bg-card/80 border-transparent hover:border-border/50"
                           )}
                         >
                           <Icon className="h-5 w-5" />
@@ -123,7 +142,23 @@ export function Navigation() {
                   
                   {/* Footer */}
                   <div className="px-3 py-3 border-t">
-                    <ThemeToggle />
+                    {/* Logout Button */}
+                    <Button
+                      variant="ghost"
+                      onClick={async () => {
+                        setIsLoggingOut(true)
+                        try {
+                          await logout()
+                        } finally {
+                          setIsLoggingOut(false)
+                        }
+                      }}
+                      disabled={isLoggingOut}
+                      className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <LogOut className="h-4 w-4 mr-3" />
+                      <span>{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+                    </Button>
                   </div>
                 </div>
               </motion.div>
@@ -132,63 +167,72 @@ export function Navigation() {
         </AnimatePresence>
       </nav>
 
-      {/* Desktop Navigation */}
-      <motion.nav 
-        className={cn(
-          "hidden sm:flex sm:flex-col sm:fixed sm:inset-y-0 sm:z-50",
-          "bg-background/95 backdrop-blur-xl",
-          "shadow-xl"
-        )}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        animate={prefersReducedMotion ? undefined : { width: shouldExpand ? 200 : 56 }}
-        transition={prefersReducedMotion ? { duration: 0 } : { 
-          type: "spring", 
-          damping: 30, 
-          stiffness: 300,
-          mass: 0.8
-        }}
-      >
+      {/* Desktop Navigation - Hidden on mobile */}
+      {!isMobile && (
+        <motion.nav 
+          className={cn(
+            "flex flex-col fixed left-0 top-0 bottom-0 z-40",
+            "bg-card/80 backdrop-blur-xl border-r-2 border-border/50",
+            "shadow-2xl",
+            // Hide scrollbars when collapsed and ensure overflow is hidden during animation
+            !shouldExpand && "scrollbar-hide",
+            "overflow-hidden" // Always clip content to prevent overflow during animation
+          )}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          animate={prefersReducedMotion ? undefined : { width: shouldExpand ? 200 : 56 }}
+          transition={prefersReducedMotion ? { duration: 0 } : { 
+            type: "spring", 
+            damping: 35, 
+            stiffness: 400,
+            mass: 0.7
+          }}
+          style={{
+            scrollbarWidth: !shouldExpand ? 'none' : undefined,
+            msOverflowStyle: !shouldExpand ? 'none' : undefined,
+            overflowX: 'hidden',
+          }}
+        >
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className={cn(
-            "flex items-center",
-            shouldExpand ? "px-2.5 py-3" : "px-2 py-2 justify-center"
+            "flex items-center border-b border-border/50",
+            shouldExpand ? "px-3 py-4" : "px-2 py-3 justify-center"
           )}>
             <motion.div 
-              className="kenya-gradient w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 shadow-lg"
-              whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
+              className="kenya-gradient w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg"
+              whileHover={prefersReducedMotion ? undefined : { scale: 1.05, rotate: 5 }}
               whileTap={prefersReducedMotion ? undefined : { scale: 0.95 }}
             >
-              <span className="text-white font-bold text-lg">P</span>
+              <span className="text-white font-bold text-xl">P</span>
             </motion.div>
             
             <AnimatePresence mode="wait">
               {shouldExpand && (
                 <>
                   <motion.div 
-                    className="ml-4 overflow-hidden"
-                    initial={prefersReducedMotion ? false : { opacity: 0, x: -20 }}
-                    animate={prefersReducedMotion ? {} : { opacity: 1, x: 0 }}
-                    exit={prefersReducedMotion ? {} : { opacity: 0, x: -20 }}
+                    className="ml-3 overflow-hidden flex-1 min-w-0"
+                    initial={prefersReducedMotion ? false : { opacity: 0, width: 0 }}
+                    animate={prefersReducedMotion ? {} : { opacity: 1, width: 'auto' }}
+                    exit={prefersReducedMotion ? {} : { opacity: 0, width: 0 }}
                     transition={prefersReducedMotion ? { duration: 0 } : { 
                       type: "spring", 
-                      damping: 25, 
-                      stiffness: 200,
-                      delay: 0.1
+                      damping: 30, 
+                      stiffness: 300,
+                      delay: 0.05
                     }}
                   >
-                    <h1 className="text-sm font-semibold whitespace-nowrap">
+                    <h1 className="text-sm font-bold whitespace-nowrap text-slate-900 dark:text-foreground">
                       Pemwa Payroll
                     </h1>
-                    <p className="text-[11px] text-muted-foreground whitespace-nowrap font-medium">
+                    <p className="text-[10px] text-slate-600 dark:text-muted-foreground whitespace-nowrap font-medium">
                       Kenyan Payroll System
                     </p>
                   </motion.div>
                   
                   {/* Toggle Button */}
                   <motion.div
-                    className="ml-auto"
+                    className="ml-auto flex-shrink-0"
                     initial={prefersReducedMotion ? false : { opacity: 0 }}
                     animate={prefersReducedMotion ? {} : { opacity: 1 }}
                     exit={prefersReducedMotion ? {} : { opacity: 0 }}
@@ -198,13 +242,13 @@ export function Navigation() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-10 w-10 rounded-xl hover:bg-accent/50 transition-colors"
+                      className="h-9 w-9 rounded-lg hover:bg-accent/60 transition-colors border border-border/50"
                       onClick={() => {
                         setIsCollapsed(!isCollapsed)
                         setIsPinned(!isCollapsed)
                       }}
                     >
-                      <ChevronLeft className="h-5 w-5" />
+                      <ChevronLeft className="h-4 w-4" />
                     </Button>
                   </motion.div>
                 </>
@@ -214,9 +258,18 @@ export function Navigation() {
           
           {/* Navigation Items */}
           <div className={cn(
-            "flex-1 px-2 py-2 space-y-1",
-            shouldExpand ? "overflow-y-auto" : "overflow-hidden"
-          )}>
+            "flex-1 overflow-y-auto overflow-x-hidden",
+            shouldExpand ? "px-2 py-3 space-y-1.5" : "px-2 py-4 space-y-2",
+            // Hide scrollbar completely when collapsed
+            !shouldExpand && "scrollbar-hide"
+          )}
+          style={!shouldExpand ? {
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+          } : {
+            scrollbarWidth: 'thin',
+          }}
+          >
             {navigation.map((item, index) => {
               const Icon = item.icon
               const isActive = pathname === item.href
@@ -224,48 +277,74 @@ export function Navigation() {
               return (
                 <motion.div
                   key={item.name}
+                  layout
                   initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
                   animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
                   transition={prefersReducedMotion ? { duration: 0 } : { 
                     delay: index * 0.05,
                     type: "spring",
                     damping: 25,
-                    stiffness: 200
+                    stiffness: 200,
+                    layout: { type: "spring", damping: 30, stiffness: 300 }
                   }}
                 >
                   <Link
                     to={item.href}
                     className={cn(
-                      "flex items-center px-2 py-2 rounded-md text-[12px] font-medium transition-all duration-300 group relative",
-                      "hover:shadow-md hover:shadow-primary/10",
+                      "flex items-center rounded-lg text-sm font-medium transition-all duration-300 group relative overflow-hidden min-w-0",
+                      "hover:bg-accent/50",
+                      shouldExpand ? "px-3 py-2.5" : "px-3 py-3 justify-center",
                       isActive
-                        ? "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow lg:shadow-primary/25"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent/40"
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-foreground"
                     )}
                     title={!shouldExpand ? item.name : undefined}
                   >
+                    {/* Left border indicator for active state */}
+                    {isActive && (
+                      <motion.div
+                        className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full"
+                        layoutId="activeIndicator"
+                        transition={{
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 30
+                        }}
+                      />
+                    )}
+                    
                     <motion.div
-                      whileHover={prefersReducedMotion ? undefined : { scale: 1.1 }}
+                      className={cn(
+                        "rounded-lg transition-colors flex items-center justify-center",
+                        shouldExpand ? "p-1.5" : "p-2",
+                        isActive 
+                          ? "kenya-gradient" 
+                          : "group-hover:bg-accent/50"
+                      )}
+                      whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
                       whileTap={prefersReducedMotion ? undefined : { scale: 0.95 }}
                     >
                       <Icon className={cn(
-                        "h-4 w-4 flex-shrink-0 transition-colors",
-                        isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                        "flex-shrink-0 transition-colors",
+                        shouldExpand ? "h-4 w-4" : "h-5 w-5",
+                        isActive 
+                          ? "text-white" 
+                          : "text-slate-600 dark:text-muted-foreground group-hover:text-slate-900 dark:group-hover:text-foreground"
                       )} />
                     </motion.div>
                     
                     <AnimatePresence mode="wait">
                       {shouldExpand && (
                         <motion.span 
-                          className="ml-2 font-medium whitespace-normal break-words leading-snug pr-2"
-                          initial={prefersReducedMotion ? false : { opacity: 0, x: -10 }}
-                          animate={prefersReducedMotion ? {} : { opacity: 1, x: 0 }}
-                          exit={prefersReducedMotion ? {} : { opacity: 0, x: -10 }}
+                          className="ml-3 font-semibold whitespace-nowrap flex-1 overflow-hidden"
+                          initial={prefersReducedMotion ? false : { opacity: 0, width: 0 }}
+                          animate={prefersReducedMotion ? {} : { opacity: 1, width: 'auto' }}
+                          exit={prefersReducedMotion ? {} : { opacity: 0, width: 0 }}
                           transition={prefersReducedMotion ? { duration: 0 } : { 
                             type: "spring", 
-                            damping: 25, 
-                            stiffness: 200,
-                            delay: 0.1
+                            damping: 30, 
+                            stiffness: 300,
+                            delay: 0.08
                           }}
                         >
                           {item.name}
@@ -273,23 +352,13 @@ export function Navigation() {
                       )}
                     </AnimatePresence>
                     
-                    {/* Active indicator */}
-                    {isActive && (
-                      <motion.div
-                        className="absolute right-2 w-2 h-2 bg-primary-foreground rounded-full"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.2 }}
-                      />
-                    )}
-                    
                     {/* Enhanced Tooltip for collapsed state */}
                     {!shouldExpand && (
                       <motion.div 
-                        className="absolute left-full ml-3 px-3 py-2 bg-popover text-popover-foreground text-sm rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50 whitespace-nowrap"
+                        className="absolute left-full ml-3 px-3 py-2 bg-popover border border-border text-popover-foreground text-sm rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50 whitespace-nowrap"
                       >
                         {item.name}
-                        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1 w-2 h-2 bg-popover rotate-45" />
+                        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1 w-2 h-2 bg-popover border-l border-b border-border rotate-45" />
                       </motion.div>
                     )}
                   </Link>
@@ -298,53 +367,47 @@ export function Navigation() {
             })}
           </div>
           
-          {/* Footer - Hide horizontal navigation when collapsed */}
-          {shouldExpand && (
-            <div className="px-3 py-4">
-              <motion.div 
-                className="flex items-center"
-                initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
-                animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
-                transition={prefersReducedMotion ? { duration: 0 } : { delay: 0.3 }}
+          {/* Footer - Logout */}
+          <div className={cn(
+            "border-t border-border/50",
+            shouldExpand ? "px-3 py-4" : "px-2 py-3"
+          )}>
+            {/* Logout Button */}
+            <motion.div
+              initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
+              animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+              transition={prefersReducedMotion ? { duration: 0 } : { delay: 0.35 }}
+            >
+              <Button
+                variant="ghost"
+                onClick={async () => {
+                  setIsLoggingOut(true)
+                  try {
+                    await logout()
+                  } finally {
+                    setIsLoggingOut(false)
+                  }
+                }}
+                disabled={isLoggingOut}
+                className={cn(
+                  "w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10",
+                  shouldExpand ? "justify-start px-3 py-2.5" : "justify-center px-3 py-3"
+                )}
+                title={!shouldExpand ? "Logout" : undefined}
               >
-                <ThemeToggle />
-                <AnimatePresence mode="wait">
-                  {shouldExpand && (
-                    <motion.div 
-                      className="ml-3"
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -10 }}
-                      transition={{ 
-                        type: "spring", 
-                        damping: 25, 
-                        stiffness: 200,
-                        delay: 0.1
-                      }}
-                    >
-                      <span className="text-sm text-muted-foreground font-medium">Theme Settings</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            </div>
-          )}
-          
-          {/* Collapsed Footer - Only Theme Toggle */}
-          {!shouldExpand && (
-            <div className="px-2 py-3">
-              <motion.div 
-                className="flex justify-center"
-                initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
-                animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
-                transition={prefersReducedMotion ? { duration: 0 } : { delay: 0.3 }}
-              >
-                <ThemeToggle />
-              </motion.div>
-            </div>
-          )}
+                <LogOut className={cn(
+                  "flex-shrink-0",
+                  shouldExpand ? "h-4 w-4 mr-3" : "h-5 w-5"
+                )} />
+                {shouldExpand && (
+                  <span>{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+                )}
+              </Button>
+            </motion.div>
+          </div>
         </div>
       </motion.nav>
+      )}
     </>
   )
 }

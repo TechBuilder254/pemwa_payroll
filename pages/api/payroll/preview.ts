@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import type { Allowances, VoluntaryDeductions, Employee, PayrollSettings } from '@/lib/supabase'
-import { calculatePayroll, getDefaultPayrollSettings } from '@/lib/payroll-calculations'
+import { calculatePayroll } from '@/lib/payroll-calculations'
+import { query } from '@/lib/db'
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
     res.status(405).json({ error: 'Method Not Allowed' })
@@ -18,7 +19,23 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     settings?: PayrollSettings
   }
 
-  const effectiveSettings = settings ?? ({ id: 'default', created_at: new Date().toISOString(), ...getDefaultPayrollSettings() } as PayrollSettings)
+  // Fetch settings from database if not provided
+  let effectiveSettings = settings
+  if (!effectiveSettings) {
+    try {
+      const { rows } = await query(
+        `select * from payroll_settings where is_active = true order by effective_from desc limit 1`
+      )
+      if (!rows || rows.length === 0) {
+        res.status(404).json({ error: 'No active payroll settings found. Please configure settings first.' })
+        return
+      }
+      effectiveSettings = rows[0] as PayrollSettings
+    } catch (error: any) {
+      res.status(500).json({ error: `Failed to load payroll settings: ${error.message}` })
+      return
+    }
+  }
 
   const result = calculatePayroll(
     employee as Employee,

@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useSidebar } from '@/contexts/sidebar-context'
+import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,50 +21,36 @@ import {
   Users,
   TrendingUp,
   Plus,
-  Minus
+  Minus,
+  Shield,
+  Home,
+  Banknote,
+  ArrowRight
 } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { formatCurrency } from '@/lib/payroll-calculations'
 import { generateRemittancePDF } from '@/lib/exports/pdf'
 import { generateRemittanceExcel } from '@/lib/exports/excel'
+import { useRemittances } from '@/hooks/useRemittances'
+import { useEmployees } from '@/hooks/useEmployees'
 
-// Mock remittance data
-const mockRemittances = [
-  {
-    month: '2024-12',
-    employees: [
-      {
-        id: '1',
-        name: 'John Kamau',
-        employee_id: 'EMP001',
-        gross_salary: 113000,
-        nssf_employee: 4320,
-        nssf_employer: 4320,
-        shif_employee: 3107.5,
-        shif_employer: 3107.5,
-        ahl_employee: 1695,
-        ahl_employer: 1695,
-        paye_after_relief: 23100,
-        net_salary: 78777.5,
-        total_employer_cost: 124252.5
-      },
-      {
-        id: '2',
-        name: 'Mary Wanjiku',
-        employee_id: 'EMP002',
-        gross_salary: 158000,
-        nssf_employee: 4320,
-        nssf_employer: 4320,
-        shif_employee: 4345,
-        shif_employer: 4345,
-        ahl_employee: 2370,
-        ahl_employer: 2370,
-        paye_after_relief: 35100,
-        net_salary: 103865,
-        total_employer_cost: 173825
-      }
-    ]
-  }
-]
+// Remittance data structure (matches API response)
+type RemittanceEmployee = {
+  id?: string
+  employee_id: string
+  employee_code: string
+  employee_name: string
+  gross_salary: number
+  nssf_employee: number
+  nssf_employer: number
+  shif_employee: number
+  shif_employer: number
+  ahl_employee: number
+  ahl_employer: number
+  paye: number
+  net_salary: number
+  employer_cost: number
+}
 
 interface RemittanceTotals {
   nssfEmployee: number
@@ -78,35 +67,69 @@ interface RemittanceTotals {
   totalEmployerCost: number
 }
 
-function RemittanceSummary({ totals, month }: { totals: RemittanceTotals, month: string }) {
+function RemittanceSummary({ totals, month, employeeCount }: { totals: RemittanceTotals, month: string, employeeCount: number }) {
   const dueDate = new Date(month + '-09')
   const isOverdue = dueDate < new Date()
   
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Calculator className="h-5 w-5" />
-          Monthly Remittance Summary
-        </CardTitle>
-        <CardDescription>
-          {new Date(month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Due Date Alert */}
-        <div className={`p-4 rounded-lg border ${isOverdue ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`}>
-          <div className="flex items-center gap-2">
+    <Card className="border-2">
+      <CardHeader className="bg-gradient-to-r from-blue-500/10 to-blue-600/5 border-b">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <div className="p-2 rounded-lg bg-blue-500/10">
+                <Calculator className="h-5 w-5 text-blue-600" />
+              </div>
+              Monthly Remittance Summary
+            </CardTitle>
+            <CardDescription className="mt-1">
+              {new Date(month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </CardDescription>
+          </div>
+          <Badge variant={isOverdue ? 'destructive' : 'default'} className="gap-2">
             {isOverdue ? (
-              <AlertCircle className="h-5 w-5 text-red-600" />
+              <>
+                <AlertCircle className="h-3 w-3" />
+                Overdue
+              </>
             ) : (
-              <Clock className="h-5 w-5 text-yellow-600" />
+              <>
+                <Clock className="h-3 w-3" />
+                Due Soon
+              </>
+            )}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6 pt-6">
+        {/* Due Date Alert */}
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={cn(
+            "p-4 rounded-lg border-2",
+            isOverdue 
+              ? 'bg-red-500/10 border-red-400/50 dark:bg-red-950/20' 
+              : 'bg-amber-500/10 border-amber-400/50 dark:bg-amber-950/20'
+          )}
+        >
+          <div className="flex items-center gap-3">
+            {isOverdue ? (
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+            ) : (
+              <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             )}
             <div>
-              <p className={`font-medium ${isOverdue ? 'text-red-800' : 'text-yellow-800'}`}>
+              <p className={cn(
+                "font-medium",
+                isOverdue ? 'text-red-800 dark:text-red-300' : 'text-amber-800 dark:text-amber-300'
+              )}>
                 {isOverdue ? 'Overdue' : 'Due Soon'}
               </p>
-              <p className={`text-sm ${isOverdue ? 'text-red-600' : 'text-yellow-600'}`}>
+              <p className={cn(
+                "text-sm",
+                isOverdue ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'
+              )}>
                 Remittance due: {dueDate.toLocaleDateString('en-US', { 
                   month: 'long', 
                   day: 'numeric', 
@@ -115,176 +138,216 @@ function RemittanceSummary({ totals, month }: { totals: RemittanceTotals, month:
               </p>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Agency Totals */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* NSSF */}
-          <Card className="border-blue-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-blue-600" />
-                NSSF
-              </CardTitle>
-              <CardDescription>National Social Security Fund</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Employee Contributions</span>
-                <span className="font-medium">{formatCurrency(totals.nssfEmployee)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Employer Contributions</span>
-                <span className="font-medium">{formatCurrency(totals.nssfEmployer)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between font-semibold text-blue-600">
-                <span>Total NSSF</span>
-                <span>{formatCurrency(totals.nssfTotal)}</span>
-              </div>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <Card className="border-2 border-blue-300/50 hover:border-blue-400/70 transition-colors">
+              <CardHeader className="pb-3 bg-gradient-to-r from-blue-500/10 to-blue-600/5 border-b">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-blue-500/10">
+                    <Shield className="h-5 w-5 text-blue-600" />
+                  </div>
+                  NSSF
+                </CardTitle>
+                <CardDescription>National Social Security Fund</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-4">
+                <div className="flex justify-between items-center p-2 rounded-lg border border-blue-200/30 bg-card min-w-0">
+                  <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">Employee</span>
+                  <span className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-foreground truncate text-right ml-1">{formatCurrency(totals.nssfEmployee)}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 rounded-lg border border-blue-200/30 bg-card min-w-0">
+                  <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">Employer</span>
+                  <span className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-foreground truncate text-right ml-1">{formatCurrency(totals.nssfEmployer)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center p-2 sm:p-3 rounded-lg bg-gradient-to-r from-blue-500/10 to-blue-600/5 border border-blue-300/50 min-w-0">
+                  <span className="font-semibold text-xs sm:text-sm text-foreground truncate pr-1">Total</span>
+                  <span className="font-bold text-blue-600 text-sm sm:text-lg truncate text-right ml-1">{formatCurrency(totals.nssfTotal)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
           {/* SHIF */}
-          <Card className="border-green-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-green-600" />
-                SHIF
-              </CardTitle>
-              <CardDescription>Social Health Insurance Fund</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Employee Contributions</span>
-                <span className="font-medium">{formatCurrency(totals.shifEmployee)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Employer Contributions</span>
-                <span className="font-medium">{formatCurrency(totals.shifEmployer)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between font-semibold text-green-600">
-                <span>Total SHIF</span>
-                <span>{formatCurrency(totals.shifTotal)}</span>
-              </div>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <Card className="border-2 border-green-300/50 hover:border-green-400/70 transition-colors">
+              <CardHeader className="pb-3 bg-gradient-to-r from-green-500/10 to-green-600/5 border-b">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-green-500/10">
+                    <Building2 className="h-5 w-5 text-green-600" />
+                  </div>
+                  SHIF
+                </CardTitle>
+                <CardDescription>Social Health Insurance Fund</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-4">
+                <div className="flex justify-between items-center p-2 rounded-lg border border-green-200/30 bg-card min-w-0">
+                  <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">Employee</span>
+                  <span className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-foreground truncate text-right ml-1">{formatCurrency(totals.shifEmployee)}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 rounded-lg border border-amber-300/40 border-dashed bg-card/50 min-w-0">
+                  <span className="text-xs sm:text-sm italic text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">Employer</span>
+                  <span className="font-semibold italic text-xs sm:text-sm text-slate-900 dark:text-foreground whitespace-nowrap ml-1">N/A</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center p-2 sm:p-3 rounded-lg bg-gradient-to-r from-green-500/10 to-green-600/5 border border-green-300/50 min-w-0">
+                  <span className="font-semibold text-xs sm:text-sm text-foreground truncate pr-1">Total</span>
+                  <span className="font-bold text-green-600 text-sm sm:text-lg truncate text-right ml-1">{formatCurrency(totals.shifEmployee)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
           {/* AHL */}
-          <Card className="border-purple-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-purple-600" />
-                AHL
-              </CardTitle>
-              <CardDescription>Affordable Housing Levy</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Employee Contributions</span>
-                <span className="font-medium">{formatCurrency(totals.ahlEmployee)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Employer Contributions</span>
-                <span className="font-medium">{formatCurrency(totals.ahlEmployer)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between font-semibold text-purple-600">
-                <span>Total AHL</span>
-                <span>{formatCurrency(totals.ahlTotal)}</span>
-              </div>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Card className="border-2 border-purple-300/50 hover:border-purple-400/70 transition-colors">
+              <CardHeader className="pb-3 bg-gradient-to-r from-purple-500/10 to-purple-600/5 border-b">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-purple-500/10">
+                    <Home className="h-5 w-5 text-purple-600" />
+                  </div>
+                  AHL
+                </CardTitle>
+                <CardDescription>Affordable Housing Levy</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-4">
+                <div className="flex justify-between items-center p-2 rounded-lg border border-purple-200/30 bg-card min-w-0">
+                  <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">Employee</span>
+                  <span className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-foreground truncate text-right ml-1">{formatCurrency(totals.ahlEmployee)}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 rounded-lg border border-purple-200/30 bg-card min-w-0">
+                  <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">Employer</span>
+                  <span className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-foreground truncate text-right ml-1">{formatCurrency(totals.ahlEmployer)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center p-2 sm:p-3 rounded-lg bg-gradient-to-r from-purple-500/10 to-purple-600/5 border border-purple-300/50 min-w-0">
+                  <span className="font-semibold text-xs sm:text-sm text-foreground truncate pr-1">Total</span>
+                  <span className="font-bold text-purple-600 text-sm sm:text-lg truncate text-right ml-1">{formatCurrency(totals.ahlTotal)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
           {/* PAYE */}
-          <Card className="border-orange-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-orange-600" />
-                PAYE
-              </CardTitle>
-              <CardDescription>Income Tax</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">PAYE (KRA)</span>
-                <span className="font-medium">{formatCurrency(totals.payeTotal)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between font-semibold text-orange-600">
-                <span>Total</span>
-                <span>{formatCurrency(totals.payeTotal)}</span>
-              </div>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <Card className="border-2 border-orange-300/50 hover:border-orange-400/70 transition-colors">
+              <CardHeader className="pb-3 bg-gradient-to-r from-orange-500/10 to-orange-600/5 border-b">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-orange-500/10">
+                    <DollarSign className="h-5 w-5 text-orange-600" />
+                  </div>
+                  PAYE
+                </CardTitle>
+                <CardDescription>Income Tax</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-4">
+                <div className="flex justify-between items-center p-2 rounded-lg border border-orange-200/30 bg-card min-w-0">
+                  <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">PAYE (KRA)</span>
+                  <span className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-foreground truncate text-right ml-1">{formatCurrency(totals.payeTotal)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center p-2 sm:p-3 rounded-lg bg-gradient-to-r from-orange-500/10 to-orange-600/5 border border-orange-300/50 min-w-0">
+                  <span className="font-semibold text-xs sm:text-sm text-foreground truncate pr-1">Total</span>
+                  <span className="font-bold text-orange-600 text-sm sm:text-lg truncate text-right ml-1">{formatCurrency(totals.payeTotal)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
 
         {/* Summary Totals */}
-        <Card className="bg-primary/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Monthly Totals
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Total Net Payroll</span>
-                  <span className="font-semibold text-green-600">{formatCurrency(totals.totalNetPayroll)}</span>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <Card className="border-2 bg-gradient-to-br from-primary/5 to-primary/10">
+            <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 border-b">
+              <CardTitle className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <TrendingUp className="h-5 w-5 text-primary" />
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Total Employer Cost</span>
-                  <span className="font-semibold text-blue-600">{formatCurrency(totals.totalEmployerCost)}</span>
+                Monthly Totals
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-2 sm:p-3 rounded-lg border border-green-200/30 bg-card min-w-0">
+                    <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">Net Payroll</span>
+                    <span className="font-bold text-green-600 text-sm sm:text-lg truncate text-right ml-1">{formatCurrency(totals.totalNetPayroll)}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 sm:p-3 rounded-lg border border-blue-200/30 bg-card min-w-0">
+                    <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">Employer Cost</span>
+                    <span className="font-bold text-blue-600 text-sm sm:text-lg truncate text-right ml-1">{formatCurrency(totals.totalEmployerCost)}</span>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-2 sm:p-3 rounded-lg border border-red-200/30 bg-card min-w-0">
+                    <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">Gov Remit</span>
+                    <span className="font-bold text-red-600 text-sm sm:text-lg truncate text-right ml-1">
+                      {formatCurrency(totals.nssfTotal + totals.shifTotal + totals.ahlTotal + totals.payeTotal)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 sm:p-3 rounded-lg border border-border/50 bg-card min-w-0">
+                    <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">Employees</span>
+                    <Badge variant="outline" className="font-bold text-sm sm:text-lg px-2 sm:px-3 py-1 flex-shrink-0">{employeeCount}</Badge>
+                  </div>
                 </div>
               </div>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Total Government Remittances</span>
-                  <span className="font-semibold text-red-600">
-                    {formatCurrency(totals.nssfTotal + totals.shifTotal + totals.ahlTotal + totals.payeTotal)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Employees Count</span>
-                  <span className="font-semibold">{mockRemittances[0]?.employees.length || 0}</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </motion.div>
       </CardContent>
     </Card>
   )
 }
 
-function ExpandableEmployeeCard({ employee }: { employee: typeof mockRemittances[0]['employees'][0] }) {
+function ExpandableEmployeeCard({ employee }: { employee: RemittanceEmployee }) {
   const [isExpanded, setIsExpanded] = useState(false)
 
   return (
     <Card className="mb-3 overflow-hidden">
       <CardContent className="p-0">
         {/* Collapsed View - Minimal Details */}
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center space-x-3 flex-1">
-            <div className="kenya-gradient w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-bold text-sm">
-                {employee.name.split(' ').map(n => n[0]).join('')}
+        <div className="flex items-center justify-between p-3 sm:p-4 gap-2 min-w-0">
+          <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+            <div className="kenya-gradient w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0">
+              <span className="text-white font-bold text-xs sm:text-sm">
+                {employee.employee_name.split(' ').map((n: string) => n[0]).join('')}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-semibold text-lg truncate">{employee.name}</div>
-              <div className="text-sm text-muted-foreground">{employee.employee_id}</div>
+              <div className="font-semibold text-sm sm:text-lg truncate text-slate-900 dark:text-foreground">{employee.employee_name}</div>
+              <div className="text-xs sm:text-sm text-slate-600 dark:text-muted-foreground truncate">{employee.employee_code}</div>
             </div>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
             <div className="text-right">
-              <div className="font-bold text-primary text-lg">
+              <div className="font-bold text-primary text-sm sm:text-lg whitespace-nowrap">
                 {formatCurrency(employee.net_salary)}
               </div>
-              <div className="text-xs text-muted-foreground">Net Salary</div>
+              <div className="text-xs text-slate-600 dark:text-muted-foreground font-medium whitespace-nowrap">Net</div>
             </div>
             <Button
               variant="ghost"
@@ -303,150 +366,170 @@ function ExpandableEmployeeCard({ employee }: { employee: typeof mockRemittances
 
         {/* Expanded View - Full Details */}
         {isExpanded && (
-          <div className="border-t bg-muted/20">
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="border-t bg-card/50"
+          >
             {/* Employee Deductions Section */}
-            <div className="p-4">
-              <h4 className="font-semibold text-sm text-foreground mb-3">Employee Deductions</h4>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-sm text-muted-foreground">Gross Salary</span>
-                  <span className="font-semibold text-lg">{formatCurrency(employee.gross_salary)}</span>
+            <div className="p-4 border-b border-border/50">
+              <h4 className="font-semibold text-sm text-foreground mb-3 flex items-center gap-2">
+                <Calculator className="h-4 w-4 text-red-500" />
+                Employee Deductions
+              </h4>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center p-2 rounded-lg border border-green-200/30 bg-card min-w-0">
+                  <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">Gross</span>
+                  <span className="font-semibold text-sm sm:text-lg text-slate-900 dark:text-foreground truncate text-right ml-1">{formatCurrency(employee.gross_salary)}</span>
                 </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-sm text-muted-foreground">PAYE</span>
-                  <span className="font-medium">{formatCurrency(employee.paye_after_relief)}</span>
+                <div className="flex justify-between items-center p-2 rounded-lg border border-red-200/30 bg-card min-w-0">
+                  <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">PAYE</span>
+                  <span className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-foreground truncate text-right ml-1">{formatCurrency(employee.paye)}</span>
                 </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-sm text-muted-foreground">NSSF (Employee)</span>
-                  <span className="font-medium">{formatCurrency(employee.nssf_employee)}</span>
+                <div className="flex justify-between items-center p-2 rounded-lg border border-red-200/30 bg-card min-w-0">
+                  <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">NSSF Emp</span>
+                  <span className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-foreground truncate text-right ml-1">{formatCurrency(employee.nssf_employee)}</span>
                 </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-sm text-muted-foreground">SHIF (Employee)</span>
-                  <span className="font-medium">{formatCurrency(employee.shif_employee)}</span>
+                <div className="flex justify-between items-center p-2 rounded-lg border border-red-200/30 bg-card min-w-0">
+                  <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">SHIF Emp</span>
+                  <span className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-foreground truncate text-right ml-1">{formatCurrency(employee.shif_employee)}</span>
                 </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-sm text-muted-foreground">AHL (Employee)</span>
-                  <span className="font-medium">{formatCurrency(employee.ahl_employee)}</span>
+                <div className="flex justify-between items-center p-2 rounded-lg border border-red-200/30 bg-card min-w-0">
+                  <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">AHL Emp</span>
+                  <span className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-foreground truncate text-right ml-1">{formatCurrency(employee.ahl_employee)}</span>
                 </div>
               </div>
             </div>
             
             {/* Employer Contributions Section */}
-            <div className="p-4 border-t bg-muted/10">
-              <h4 className="font-semibold text-sm text-foreground mb-3">Employer Contributions</h4>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-sm text-muted-foreground">NSSF (Employer)</span>
-                  <span className="font-medium">{formatCurrency(employee.nssf_employer)}</span>
+            <div className="p-4">
+              <h4 className="font-semibold text-sm text-foreground mb-3 flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-blue-500" />
+                Employer Contributions
+              </h4>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center p-2 rounded-lg border border-blue-200/30 bg-card min-w-0">
+                  <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">NSSF Empr</span>
+                  <span className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-foreground truncate text-right ml-1">{formatCurrency(employee.nssf_employer)}</span>
                 </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-sm text-muted-foreground">SHIF (Employer)</span>
-                  <span className="font-medium">{formatCurrency(employee.shif_employer)}</span>
+                <div className="flex justify-between items-center p-2 rounded-lg border border-amber-300/40 border-dashed bg-card/50 min-w-0">
+                  <span className="text-xs sm:text-sm italic text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">SHIF Empr</span>
+                  <span className="font-semibold italic text-xs sm:text-sm text-slate-900 dark:text-foreground whitespace-nowrap ml-1">N/A</span>
                 </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-sm text-muted-foreground">AHL (Employer)</span>
-                  <span className="font-medium">{formatCurrency(employee.ahl_employer)}</span>
+                <div className="flex justify-between items-center p-2 rounded-lg border border-purple-200/30 bg-card min-w-0">
+                  <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">AHL Empr</span>
+                  <span className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-foreground truncate text-right ml-1">{formatCurrency(employee.ahl_employer)}</span>
                 </div>
-                <div className="flex justify-between items-center py-2 border-t pt-3 mt-3">
-                  <span className="font-semibold text-sm">Total Employer Cost</span>
-                  <span className="font-bold text-lg text-blue-600">{formatCurrency(employee.total_employer_cost)}</span>
+                <Separator className="my-3" />
+                <div className="flex justify-between items-center p-2 sm:p-3 rounded-lg bg-gradient-to-r from-blue-500/10 to-blue-600/5 border border-blue-300/50 min-w-0">
+                  <span className="font-semibold text-xs sm:text-sm text-foreground truncate pr-1">Total Cost</span>
+                  <span className="font-bold text-sm sm:text-lg text-blue-600 truncate text-right ml-1">{formatCurrency(employee.employer_cost)}</span>
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
       </CardContent>
     </Card>
   )
 }
 
-function EmployeeRemittanceTable({ employees }: { employees: typeof mockRemittances[0]['employees'] }) {
+function EmployeeRemittanceTable({ employees }: { employees: RemittanceEmployee[] }) {
   return (
-    <Card className="overflow-hidden min-w-0">
-      <CardHeader className="min-w-0">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <Users className="h-4 w-4" />
+    <Card className="overflow-hidden min-w-0 border-2">
+      <CardHeader className="min-w-0 bg-gradient-to-r from-primary/10 to-primary/5 border-b">
+        <CardTitle className="flex items-center gap-2">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Users className="h-5 w-5 text-primary" />
+          </div>
           <span className="truncate">Employee Breakdown</span>
         </CardTitle>
-        <CardDescription className="truncate text-xs">Individual contributions for each employee</CardDescription>
+        <CardDescription className="truncate">Individual contributions for each employee</CardDescription>
       </CardHeader>
       <CardContent className="min-w-0">
         {/* Mobile View - Expandable Cards */}
         <div className="sm:hidden space-y-2">
           {employees.map((employee) => (
-            <ExpandableEmployeeCard key={employee.id} employee={employee} />
+            <ExpandableEmployeeCard key={employee.employee_id || employee.employee_code} employee={employee} />
           ))}
         </div>
 
         {/* Desktop View - Table */}
-        <div className="hidden sm:block rounded-md border min-w-0 overflow-hidden">
+        <div className="hidden sm:block rounded-md border-2 min-w-0 overflow-hidden">
           <table className="w-full table-fixed text-[12px]">
             <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground truncate" style={{width:"20%"}}>
+              <tr className="border-b bg-card/50">
+                <th className="h-10 px-2 text-left align-middle font-semibold text-slate-700 dark:text-muted-foreground truncate" style={{width:"20%"}}>
                   Employee
                 </th>
-                <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground truncate" style={{width:"12%"}}>
+                <th className="h-10 px-2 text-left align-middle font-semibold text-slate-700 dark:text-muted-foreground truncate" style={{width:"12%"}}>
                   Gross Salary
                 </th>
-                <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground truncate" style={{width:"12%"}}>
+                <th className="h-10 px-2 text-left align-middle font-semibold text-slate-700 dark:text-muted-foreground truncate" style={{width:"12%"}}>
                   PAYE
                 </th>
-                <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground truncate" style={{width:"12%"}}>
+                <th className="h-10 px-2 text-left align-middle font-semibold text-slate-700 dark:text-muted-foreground truncate" style={{width:"12%"}}>
                   NSSF (E/E)
                 </th>
-                <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground truncate" style={{width:"12%"}}>
-                  SHIF (E/E)
+                <th className="h-10 px-2 text-left align-middle font-semibold text-slate-700 dark:text-muted-foreground truncate" style={{width:"12%"}}>
+                  SHIF (Emp)
                 </th>
-                <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground truncate" style={{width:"12%"}}>
+                <th className="h-10 px-2 text-left align-middle font-semibold text-slate-700 dark:text-muted-foreground truncate" style={{width:"12%"}}>
                   AHL (E/E)
                 </th>
-                <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground truncate" style={{width:"12%"}}>
+                <th className="h-10 px-2 text-left align-middle font-semibold text-slate-700 dark:text-muted-foreground truncate" style={{width:"12%"}}>
                   Net Salary
                 </th>
               </tr>
             </thead>
             <tbody>
-              {employees.map((employee) => (
-                <tr key={employee.id} className="border-b hover:bg-muted/50 transition-colors">
+              {employees.map((employee, index) => (
+                <motion.tr 
+                  key={employee.employee_id || employee.employee_code} 
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05, duration: 0.3 }}
+                  className="border-b hover:bg-card/80 transition-colors"
+                >
                   <td className="p-2 min-w-0" style={{width:"20%"}}>
                     <div className="flex items-center space-x-2 min-w-0">
                       <div className="kenya-gradient w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0">
                         <span className="text-white font-bold text-[11px]">
-                          {employee.name.split(' ').map(n => n[0]).join('')}
+                          {employee.employee_name.split(' ').map((n: string) => n[0]).join('')}
                         </span>
                       </div>
                       <div className="min-w-0">
-                        <div className="font-medium truncate" title={employee.name}>{employee.name}</div>
-                        <div className="text-xs text-muted-foreground truncate">{employee.employee_id}</div>
+                        <div className="font-medium truncate text-slate-900 dark:text-foreground" title={employee.employee_name}>{employee.employee_name}</div>
+                        <div className="text-xs text-slate-600 dark:text-muted-foreground truncate">{employee.employee_id}</div>
                       </div>
                     </div>
                   </td>
                   <td className="p-2 min-w-0" style={{width:"12%"}}>
-                    <div className="font-medium truncate" title={formatCurrency(employee.gross_salary)}>{formatCurrency(employee.gross_salary)}</div>
+                    <div className="font-semibold truncate text-slate-900 dark:text-foreground" title={formatCurrency(employee.gross_salary)}>{formatCurrency(employee.gross_salary)}</div>
                   </td>
                   <td className="p-2 min-w-0" style={{width:"12%"}}>
-                    <div className="font-medium truncate" title={formatCurrency(employee.paye_after_relief)}>{formatCurrency(employee.paye_after_relief)}</div>
+                    <div className="font-semibold truncate text-slate-900 dark:text-foreground" title={formatCurrency(employee.paye)}>{formatCurrency(employee.paye)}</div>
                   </td>
                   <td className="p-2 min-w-0" style={{width:"12%"}}>
-                    <div className="text-xs truncate" title={`${formatCurrency(employee.nssf_employee)} / ${formatCurrency(employee.nssf_employer)}`}>
-                      {formatCurrency(employee.nssf_employee)} / {formatCurrency(employee.nssf_employer)}
+                    <div className="text-xs font-medium truncate text-slate-700 dark:text-muted-foreground" title={`${formatCurrency(employee.nssf_employee)} / ${formatCurrency(employee.nssf_employer)}`}>
+                      <span className="text-slate-900 dark:text-foreground">{formatCurrency(employee.nssf_employee)}</span> / <span className="text-slate-900 dark:text-foreground">{formatCurrency(employee.nssf_employer)}</span>
                     </div>
                   </td>
                   <td className="p-2 min-w-0" style={{width:"12%"}}>
-                    <div className="text-xs truncate" title={`${formatCurrency(employee.shif_employee)} / ${formatCurrency(employee.shif_employer)}`}>
-                      {formatCurrency(employee.shif_employee)} / {formatCurrency(employee.shif_employer)}
+                    <div className="text-xs font-medium truncate text-slate-900 dark:text-foreground" title={formatCurrency(employee.shif_employee)}>
+                      {formatCurrency(employee.shif_employee)}
                     </div>
                   </td>
                   <td className="p-2 min-w-0" style={{width:"12%"}}>
-                    <div className="text-xs truncate" title={`${formatCurrency(employee.ahl_employee)} / ${formatCurrency(employee.ahl_employer)}`}>
-                      {formatCurrency(employee.ahl_employee)} / {formatCurrency(employee.ahl_employer)}
+                    <div className="text-xs font-medium truncate text-slate-700 dark:text-muted-foreground" title={`${formatCurrency(employee.ahl_employee)} / ${formatCurrency(employee.ahl_employer)}`}>
+                      <span className="text-slate-900 dark:text-foreground">{formatCurrency(employee.ahl_employee)}</span> / <span className="text-slate-900 dark:text-foreground">{formatCurrency(employee.ahl_employer)}</span>
                     </div>
                   </td>
                   <td className="p-2 min-w-0" style={{width:"12%"}}>
-                    <div className="font-semibold text-primary truncate" title={formatCurrency(employee.net_salary)}>{formatCurrency(employee.net_salary)}</div>
+                    <div className="font-bold text-primary truncate" title={formatCurrency(employee.net_salary)}>{formatCurrency(employee.net_salary)}</div>
                   </td>
-                </tr>
+                </motion.tr>
               ))}
             </tbody>
           </table>
@@ -457,24 +540,33 @@ function EmployeeRemittanceTable({ employees }: { employees: typeof mockRemittan
 }
 
 export default function RemittancesPage() {
-  const [selectedMonth, setSelectedMonth] = useState('2024-12')
+  const { shouldExpand } = useSidebar()
+  const navigate = useNavigate()
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7))
   const [isExporting, setIsExporting] = useState(false)
+  const { data: remittanceData, isLoading: isRemittancesLoading, error: remittancesError } = useRemittances(selectedMonth)
+  const { data: allEmployees } = useEmployees()
 
-  const currentRemittance = mockRemittances.find(r => r.month === selectedMonth)
-  
+  const currentRemittance = remittanceData
+
+  // Calculate how many employees don't have payroll for this month
+  const employeesWithPayroll = currentRemittance?.totals.employeeCount || 0
+  const totalEmployees = allEmployees?.length || 0
+  const missingEmployeesCount = totalEmployees - employeesWithPayroll
+
   const totals: RemittanceTotals = currentRemittance ? {
-    nssfEmployee: currentRemittance.employees.reduce((sum, emp) => sum + emp.nssf_employee, 0),
-    nssfEmployer: currentRemittance.employees.reduce((sum, emp) => sum + emp.nssf_employer, 0),
-    nssfTotal: currentRemittance.employees.reduce((sum, emp) => sum + emp.nssf_employee + emp.nssf_employer, 0),
-    shifEmployee: currentRemittance.employees.reduce((sum, emp) => sum + emp.shif_employee, 0),
-    shifEmployer: currentRemittance.employees.reduce((sum, emp) => sum + emp.shif_employer, 0),
-    shifTotal: currentRemittance.employees.reduce((sum, emp) => sum + emp.shif_employee + emp.shif_employer, 0),
-    ahlEmployee: currentRemittance.employees.reduce((sum, emp) => sum + emp.ahl_employee, 0),
-    ahlEmployer: currentRemittance.employees.reduce((sum, emp) => sum + emp.ahl_employer, 0),
-    ahlTotal: currentRemittance.employees.reduce((sum, emp) => sum + emp.ahl_employee + emp.ahl_employer, 0),
-    payeTotal: currentRemittance.employees.reduce((sum, emp) => sum + emp.paye_after_relief, 0),
-    totalNetPayroll: currentRemittance.employees.reduce((sum, emp) => sum + emp.net_salary, 0),
-    totalEmployerCost: currentRemittance.employees.reduce((sum, emp) => sum + emp.total_employer_cost, 0)
+    nssfEmployee: currentRemittance.totals.nssfEmployee,
+    nssfEmployer: currentRemittance.totals.nssfEmployer,
+    nssfTotal: currentRemittance.totals.nssfTotal,
+    shifEmployee: currentRemittance.totals.shifEmployee,
+    shifEmployer: 0, // Employer does NOT pay SHIF (backend already sets this)
+    shifTotal: currentRemittance.totals.shifTotal,
+    ahlEmployee: currentRemittance.totals.ahlEmployee,
+    ahlEmployer: currentRemittance.totals.ahlEmployer,
+    ahlTotal: currentRemittance.totals.ahlTotal,
+    payeTotal: currentRemittance.totals.payeTotal,
+    totalNetPayroll: currentRemittance.totals.totalNetPayroll,
+    totalEmployerCost: currentRemittance.totals.totalEmployerCost
   } : {
     nssfEmployee: 0, nssfEmployer: 0, nssfTotal: 0,
     shifEmployee: 0, shifEmployer: 0, shifTotal: 0,
@@ -484,7 +576,7 @@ export default function RemittancesPage() {
   }
 
   const totalGovernmentRemittances = totals.nssfTotal + totals.shifTotal + totals.ahlTotal + totals.payeTotal
-  const totalEmployerRemittances = totals.nssfEmployer + totals.shifEmployer + totals.ahlEmployer // Employer portion only
+  const totalEmployerRemittances = totals.nssfEmployer + totals.ahlEmployer // NSSF + AHL, employer does NOT pay SHIF
   const totalEmployeeRemittances = totals.nssfEmployee + totals.shifEmployee + totals.ahlEmployee + totals.payeTotal // Employee portion only
 
   const handleExportPDF = async () => {
@@ -493,7 +585,7 @@ export default function RemittancesPage() {
     const data = {
       month: selectedMonth,
       employees: currentRemittance.employees.map((e) => ({
-        employee: { name: e.name, employee_id: e.employee_id },
+        employee: { name: e.employee_name, employee_id: e.employee_code },
         month: selectedMonth,
         gross_salary: e.gross_salary,
         basic_salary: 0,
@@ -508,10 +600,10 @@ export default function RemittancesPage() {
         ahl_employer: e.ahl_employer,
         helb: 0,
         voluntary_deductions_total: 0,
-        paye_after_relief: e.paye_after_relief,
+        paye_after_relief: e.paye,
         total_deductions: 0,
         net_salary: e.net_salary,
-        total_employer_cost: e.total_employer_cost,
+        total_employer_cost: e.employer_cost,
       })),
       totals,
     }
@@ -525,7 +617,7 @@ export default function RemittancesPage() {
     const data = {
       month: selectedMonth,
       employees: currentRemittance.employees.map((e) => ({
-        employee: { name: e.name, employee_id: e.employee_id },
+        employee: { name: e.employee_name, employee_id: e.employee_code },
         month: selectedMonth,
         gross_salary: e.gross_salary,
         basic_salary: 0,
@@ -540,10 +632,10 @@ export default function RemittancesPage() {
         ahl_employer: e.ahl_employer,
         helb: 0,
         voluntary_deductions_total: 0,
-        paye_after_relief: e.paye_after_relief,
+        paye_after_relief: e.paye,
         total_deductions: 0,
         net_salary: e.net_salary,
-        total_employer_cost: e.total_employer_cost,
+        total_employer_cost: e.employer_cost,
       })),
       totals,
     }
@@ -551,119 +643,234 @@ export default function RemittancesPage() {
     setIsExporting(false)
   }
 
+
   return (
-    <div className="min-h-screen bg-background w-full overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 w-full overflow-x-hidden">
+      {/* Mobile Header */}
+      <div className="sm:hidden px-4 py-6 border-b bg-card/80 backdrop-blur-sm">
+        <div className="flex items-center justify-between min-w-0">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-bold truncate">Remittances</h1>
+            <p className="text-[12px] text-muted-foreground truncate">Monthly statutory payments</p>
+          </div>
+          <div className="kenya-gradient w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ml-2 shadow-lg">
+            <Banknote className="h-5 w-5 text-white" />
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Header */}
+      <div className={cn(
+        "hidden sm:block px-4 sm:px-6 py-6 border-b bg-card/80 backdrop-blur-sm transition-all duration-300",
+        shouldExpand ? "sm:px-4" : "sm:px-6"
+      )}>
+        <div className="flex items-center justify-between min-w-0">
+          <div className="min-w-0 flex-1">
+            <h1 className={cn(
+              "font-bold transition-all duration-300",
+              shouldExpand ? "text-xl" : "text-2xl"
+            )}>
+              Remittances
+            </h1>
+            <p className={cn(
+              "text-muted-foreground transition-all duration-300 mt-1",
+              shouldExpand ? "text-xs" : "text-sm"
+            )}>
+              Monthly statutory payments to government agencies and compliance tracking
+            </p>
+          </div>
+          <div className="kenya-gradient w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ml-4 shadow-lg">
+            <Banknote className="h-6 w-6 text-white" />
+          </div>
+        </div>
+      </div>
+
       {/* Main Content */}
-      <div className="p-4 sm:p-6 space-y-6">
+      <div className={cn(
+        "w-full min-w-0 space-y-6 transition-all duration-300",
+        "p-4 sm:p-6"
+      )}>
         {/* Prominent Government Remittances Summary */}
         {currentRemittance && (
-          <Card className="border-2 border-red-200 bg-red-50/50 dark:bg-red-950/20">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between min-w-0">
-                <div className="min-w-0 flex-1">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <DollarSign className="h-5 w-5 text-red-600" />
-                    <span>Total Government Remittances</span>
-                  </CardTitle>
-                  <CardDescription className="text-[12px]">
-                    Amount you owe to the government before paying employees
-                  </CardDescription>
-                </div>
-                <div className="flex flex-col items-end ml-4">
-                  <div className="text-2xl sm:text-3xl font-bold text-red-600">
-                    {formatCurrency(totalGovernmentRemittances)}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <Card className="border-2 border-red-400/50 bg-gradient-to-br from-red-500/10 to-red-600/5 dark:from-red-950/20 dark:to-red-950/10">
+              <CardHeader className="pb-4 border-b border-red-400/30">
+                <div className="flex items-center justify-between min-w-0">
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="flex items-center gap-2 text-xl">
+                      <div className="p-2 rounded-lg bg-red-500/20">
+                        <DollarSign className="h-6 w-6 text-red-600 dark:text-red-400" />
+                      </div>
+                      <span>Total Government Remittances</span>
+                    </CardTitle>
+                    <CardDescription className="text-sm mt-1">
+                      Amount you owe to the government before paying employees
+                    </CardDescription>
                   </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Due: {new Date(selectedMonth + '-09').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div className="bg-background/50 rounded-lg p-3">
-                  <div className="text-xs text-muted-foreground mb-1">Employer Portion</div>
-                  <div className="text-lg font-semibold text-blue-600">
-                    {formatCurrency(totalEmployerRemittances)}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground mt-1">
-                    NSSF: {formatCurrency(totals.nssfEmployer)} • SHIF: {formatCurrency(totals.shifEmployer)} • AHL: {formatCurrency(totals.ahlEmployer)}
+                  <div className="flex flex-col items-end ml-4 flex-shrink-0">
+                    <div className="text-3xl sm:text-4xl font-bold text-red-600 dark:text-red-400">
+                      {formatCurrency(totalGovernmentRemittances)}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Due: {new Date(selectedMonth + '-09').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </div>
                   </div>
                 </div>
-                <div className="bg-background/50 rounded-lg p-3">
-                  <div className="text-xs text-muted-foreground mb-1">Employee Portion (Deducted)</div>
-                  <div className="text-lg font-semibold text-green-600">
-                    {formatCurrency(totalEmployeeRemittances)}
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="rounded-lg p-4 border border-blue-300/30 bg-card">
+                    <div className="text-xs font-medium text-slate-700 dark:text-muted-foreground mb-2">Employer Portion</div>
+                    <div className="text-xl font-bold text-blue-600">
+                      {formatCurrency(totalEmployerRemittances)}
+                    </div>
+                    <div className="text-[12px] text-slate-600 dark:text-muted-foreground mt-2 space-y-1.5">
+                      <div className="font-medium">NSSF: <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(totals.nssfEmployer)}</span></div>
+                      <div className="font-medium">SHIF: <span className="font-semibold text-slate-900 dark:text-foreground">N/A</span></div>
+                      <div className="font-medium">AHL: <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(totals.ahlEmployer)}</span></div>
+                    </div>
                   </div>
-                  <div className="text-[11px] text-muted-foreground mt-1">
-                    NSSF: {formatCurrency(totals.nssfEmployee)} • SHIF: {formatCurrency(totals.shifEmployee)} • AHL: {formatCurrency(totals.ahlEmployee)} • PAYE: {formatCurrency(totals.payeTotal)}
+                  <div className="rounded-lg p-4 border border-green-300/30 bg-card">
+                    <div className="text-xs font-medium text-slate-700 dark:text-muted-foreground mb-2">Employee Portion (Deducted)</div>
+                    <div className="text-xl font-bold text-green-600">
+                      {formatCurrency(totalEmployeeRemittances)}
+                    </div>
+                    <div className="text-[12px] text-slate-600 dark:text-muted-foreground mt-2 space-y-1.5">
+                      <div className="font-medium">NSSF: <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(totals.nssfEmployee)}</span></div>
+                      <div className="font-medium">SHIF: <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(totals.shifEmployee)}</span></div>
+                      <div className="font-medium">AHL: <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(totals.ahlEmployee)}</span></div>
+                      <div className="font-medium">PAYE: <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(totals.payeTotal)}</span></div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex gap-2 pt-2 border-t">
-                <Button 
-                  onClick={handleExportPDF}
-                  disabled={isExporting}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  {isExporting ? 'Exporting...' : 'Download PDF Breakdown'}
-                </Button>
-                <Button 
-                  onClick={handleExportExcel}
-                  disabled={isExporting}
-                  className="kenya-gradient text-white hover:opacity-90 flex-1"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  {isExporting ? 'Exporting...' : 'Download Excel Breakdown'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="flex gap-2 pt-4 border-t border-red-400/30">
+                  <Button 
+                    onClick={handleExportPDF}
+                    disabled={isExporting}
+                    variant="outline"
+                    className="flex-1 gap-2"
+                    size="lg"
+                  >
+                    <Download className="h-4 w-4" />
+                    {isExporting ? 'Exporting...' : 'Download PDF'}
+                  </Button>
+                  <Button 
+                    onClick={handleExportExcel}
+                    disabled={isExporting}
+                    className="kenya-gradient text-white hover:opacity-90 flex-1 gap-2 shadow-lg"
+                    size="lg"
+                  >
+                    <FileText className="h-4 w-4" />
+                    {isExporting ? 'Exporting...' : 'Export Excel'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         )}
 
         {/* Month Selection */}
-        <Card>
-          <CardHeader>
+        <Card className="border-2">
+          <CardHeader className="bg-gradient-to-r from-blue-500/10 to-blue-600/5 border-b">
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+              <div className="p-2 rounded-lg bg-blue-500/10">
+                <Calendar className="h-5 w-5 text-blue-600" />
+              </div>
               Select Month
             </CardTitle>
             <CardDescription>Choose the month for remittance summary</CardDescription>
           </CardHeader>
-          <CardContent>
-              <div className="flex items-center gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="month">Payroll Month</Label>
-                  <Input
-                    id="month"
-                    type="month"
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="w-48"
-                  />
-                </div>
+          <CardContent className="pt-6 space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="month">Payroll Month</Label>
+                <Input
+                  id="month"
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="w-48"
+                />
               </div>
+            </div>
+            
+            {/* Warning about missing employees */}
+            {!isRemittancesLoading && currentRemittance && missingEmployeesCount > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 rounded-lg border-2 border-amber-400/50 bg-amber-500/10 dark:bg-amber-950/20"
+              >
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-medium text-amber-800 dark:text-amber-300 mb-1">
+                      Incomplete Payroll Data
+                    </p>
+                    <p className="text-sm text-amber-700 dark:text-amber-400 mb-3">
+                      {missingEmployeesCount} of {totalEmployees} employee{totalEmployees !== 1 ? 's' : ''} do not have payroll records for {new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}.
+                    </p>
+                    <Button
+                      onClick={() => navigate('/payroll')}
+                      variant="outline"
+                      size="sm"
+                      className="border-amber-400 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                    >
+                      <Calculator className="h-4 w-4 mr-2" />
+                      Run Payroll for All Employees
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
           </CardContent>
         </Card>
 
+        {/* Error State */}
+        {remittancesError && (
+          <Card className="border-2 border-red-300 bg-red-50">
+            <CardContent className="p-8 text-center">
+              <p className="text-red-600">Error loading remittances: {remittancesError.message}</p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Remittance Summary */}
-        {currentRemittance ? (
+        {!remittancesError && currentRemittance && currentRemittance.totals.employeeCount > 0 ? (
           <>
-            <RemittanceSummary totals={totals} month={selectedMonth} />
-            <EmployeeRemittanceTable employees={currentRemittance.employees} />
+            <RemittanceSummary totals={totals} month={selectedMonth} employeeCount={currentRemittance.totals.employeeCount} />
+            <EmployeeRemittanceTable employees={currentRemittance.employees.map(e => ({
+              employee_id: e.employee_id,
+              employee_code: e.employee_code,
+              employee_name: e.employee_name,
+              gross_salary: e.gross_salary,
+              nssf_employee: e.nssf_employee,
+              nssf_employer: e.nssf_employer,
+              shif_employee: e.shif_employee,
+              shif_employer: e.shif_employer,
+              ahl_employee: e.ahl_employee,
+              ahl_employer: e.ahl_employer,
+              paye: e.paye,
+              net_salary: e.net_salary,
+              employer_cost: e.employer_cost,
+            }))} />
           </>
         ) : (
-          <Card className="text-center py-12">
+          <Card className="border-2 text-center py-12">
             <CardContent>
-              <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <Banknote className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">No remittance data found</h3>
               <p className="text-muted-foreground mb-4">
                 No payroll data available for the selected month
               </p>
-              <Button className="kenya-gradient text-white hover:opacity-90">
-                <Calendar className="h-4 w-4 mr-2" />
+              <Button 
+                onClick={() => navigate('/payroll')}
+                className="kenya-gradient text-white hover:opacity-90 gap-2"
+              >
+                <Calendar className="h-4 w-4" />
                 Run Payroll
               </Button>
             </CardContent>

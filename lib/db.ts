@@ -1,16 +1,52 @@
 import { Pool, QueryResult, QueryResultRow } from 'pg'
+import dotenv from 'dotenv'
+import path from 'path'
 
-const connectionString = process.env.DATABASE_URL
+// Load environment variables
+// In Vercel, env vars are automatically available, but we still load .env.local for local dev
+if (!process.env.VERCEL) {
+  const envLocalPath = path.resolve(process.cwd(), '.env.local')
+  dotenv.config({ path: envLocalPath })
+} else {
+  // On Vercel, just ensure dotenv is configured (it won't override existing env vars)
+  dotenv.config()
+}
+
+const connectionString = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL
+
+// Validate connection string
+if (!connectionString) {
+  console.error('[db] ❌ Missing database connection string!')
+  console.error('[db] Please set SUPABASE_DB_URL or DATABASE_URL in .env.local')
+  console.error('[db] Format: SUPABASE_DB_URL=postgresql://postgres:PASSWORD@db.xxxxx.supabase.co:5432/postgres')
+  throw new Error('Database connection string is required. Set SUPABASE_DB_URL or DATABASE_URL in .env.local')
+}
+
+// Validate connection string format and password
+try {
+  const url = new URL(connectionString)
+  if (!url.password || url.password.trim() === '') {
+    console.error('[db] ❌ Database connection string is missing password!')
+    console.error('[db] Connection string format should be: postgresql://postgres:PASSWORD@host:port/database')
+    throw new Error('Database connection string must include a password')
+  }
+} catch (e: any) {
+  if (e.message.includes('password')) {
+    throw e
+  }
+  console.warn('[db] ⚠️ Could not validate connection string format:', e.message)
+}
 
 export const pool = new Pool({
   connectionString,
   max: 10,
+  ssl: connectionString?.includes('supabase') ? { rejectUnauthorized: false } : undefined,
+  connectionTimeoutMillis: 10000, // 10 second timeout
+  idleTimeoutMillis: 30000,
+  allowExitOnIdle: true,
 })
 
 export async function query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
   const res = await pool.query<T>(text, params)
   return res
 }
-
-
-

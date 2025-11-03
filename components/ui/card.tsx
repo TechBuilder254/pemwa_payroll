@@ -12,6 +12,8 @@ const Card = React.forwardRef<
       "rounded-lg border bg-card text-card-foreground shadow-sm",
       // Mobile-first responsive design - compact sizing
       "p-3 sm:p-4",
+      // Prevent overflow on mobile
+      "overflow-hidden min-w-0",
       className
     )}
     {...props}

@@ -1,5 +1,27 @@
-// Keep only types here for now; Supabase client optional in the future.
-export const supabase = undefined as unknown as any
+import { createClient } from '@supabase/supabase-js'
+
+// Get Supabase URL and anon key from environment variables
+// Default to provided Supabase project if not in environment
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 
+                    process.env.VITE_SUPABASE_URL || 
+                    'https://ksuxoaddqqffoueuzmuk.supabase.co'
+
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
+                        process.env.VITE_SUPABASE_ANON_KEY || 
+                        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtzdXhvYWRkcXFmZm91ZXV6bXVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTE4OTMsImV4cCI6MjA3NzU4Nzg5M30.QJ0Z4hqNKiavQ_2SDXwkIhQK47dOqmrDGOpYK-MFesA'
+
+// Create Supabase client
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: typeof window !== 'undefined',
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+})
+
+if (typeof window !== 'undefined') {
+  console.log('✅ Supabase client initialized:', supabaseUrl)
+}
 
 // Database types
 export interface Employee {

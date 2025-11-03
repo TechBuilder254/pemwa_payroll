@@ -100,11 +100,22 @@
   }
   
   .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
   }
   
   .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+    width: 0;
+    height: 0;
+  }
+  
+  /* Hide any scroll indicators or track */
+  .scrollbar-hide::-webkit-scrollbar-track {
+    display: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar-thumb {
     display: none;
   }
 }

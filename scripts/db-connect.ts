@@ -1,13 +1,18 @@
-import 'dotenv/config'
+import dotenv from 'dotenv'
 import { Client } from 'pg'
 
+dotenv.config({ path: '.env.local' })
+
 async function main() {
-  const databaseUrl = process.env.DATABASE_URL
+  const databaseUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL
   if (!databaseUrl) {
-    console.error('[db-connect] DATABASE_URL is not set.')
+    console.error('[db-connect] SUPABASE_DB_URL or DATABASE_URL is not set.')
     process.exit(2)
   }
-  const client = new Client({ connectionString: databaseUrl })
+  const client = new Client({ 
+    connectionString: databaseUrl,
+    ssl: databaseUrl.includes('supabase') ? { rejectUnauthorized: false } : undefined
+  })
   try {
     const safe = databaseUrl.replace(/:(.+)@/, '://****:****@')
     console.log('[db-connect] Connecting to:', safe)

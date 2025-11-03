@@ -161,9 +161,9 @@ function EmployeeCard({ employee, settings }: { employee: any; settings: any }) 
                   <span>NSSF (Employer)</span>
                   <span className="font-medium">{formatCurrency(calculation.nssfEmployer)}</span>
                 </div>
-                <div className="flex justify-between text-[11px] pl-2">
+                <div className="flex justify-between text-[11px] pl-2 italic text-muted-foreground">
                   <span>SHIF (Employer)</span>
-                  <span className="font-medium">{formatCurrency(calculation.shifEmployer)}</span>
+                  <span className="font-medium">N/A</span>
                 </div>
                 <div className="flex justify-between text-[11px] pl-2">
                   <span>AHL (Employer)</span>
@@ -324,7 +324,6 @@ const Employees: React.FC = () => {
         {settings && (
           <EmployeeTable 
             employees={filteredEmployees as any}
-            settings={settings as any}
             onView={(e: any) => navigate(`/employees/${e.id}`)}
             onEdit={(e: any) => navigate(`/employees/${e.id}`)}
             onDelete={async (e: any) => {

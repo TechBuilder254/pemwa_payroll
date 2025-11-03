@@ -1,0 +1,21 @@
+# Files to ignore during Vercel deployment
+node_modules
+.git
+.env.local
+.env*.local
+dist
+*.log
+.DS_Store
+.vscode
+.idea
+coverage
+.nyc_output
+scripts
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+__tests__
+test
+tests
+

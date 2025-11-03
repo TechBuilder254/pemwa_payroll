@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { useSidebar } from '@/contexts/sidebar-context'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,11 +18,17 @@ import {
   DollarSign,
   Calculator,
   Eye,
-  Filter
+  Filter,
+  Shield,
+  Home,
+  TrendingUp,
+  CheckCircle,
+  Info
 } from 'lucide-react'
-import { formatCurrency, calculatePayroll } from '@/lib/payroll-calculations'
+import { motion } from 'framer-motion'
+import { formatCurrency } from '@/lib/payroll-calculations'
+import { usePayslips } from '@/hooks/usePayslips'
 import { useEmployees } from '@/hooks/useEmployees'
-import { usePayrollSettings } from '@/hooks/usePayrollSettings'
 import { generatePayslipPDF } from '@/lib/exports/pdf'
 import { generatePayslipExcel } from '@/lib/exports/excel'
 
@@ -57,137 +63,156 @@ type PayslipShape = {
 
 function PayslipCard({ payslip, onView, onExportPDF, onExportExcel }: { payslip: PayslipShape, onView: (p: PayslipShape) => void, onExportPDF: (p: PayslipShape) => void, onExportExcel: (p: PayslipShape) => void }) {
   return (
-    <Card className="hover:shadow-md transition-all duration-200 overflow-hidden min-w-0">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="kenya-gradient w-10 h-10 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">
-                {payslip.employee_name.split(' ').map((n: string) => n[0]).join('')}
-              </span>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <Card className="hover:shadow-lg transition-all duration-200 overflow-hidden min-w-0 border-2">
+        <CardHeader className="pb-3 bg-gradient-to-r from-primary/5 to-primary/10 border-b">
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+              <div className="kenya-gradient w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+                <span className="text-white font-bold text-xs sm:text-base">
+                  {payslip.employee_name.split(' ').map((n: string) => n[0]).join('')}
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-sm sm:text-lg text-slate-900 dark:text-foreground truncate">{payslip.employee_name}</CardTitle>
+                <CardDescription className="text-xs sm:text-sm truncate">
+                  <span className="truncate block">{payslip.employee_id}</span>
+                  <span className="hidden sm:inline"> • </span>
+                  <span className="block sm:inline truncate">{new Date(payslip.month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+                </CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-base">{payslip.employee_name}</CardTitle>
-              <CardDescription className="text-sm">
-                {payslip.employee_id} • {new Date(payslip.month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-              </CardDescription>
+            <Badge variant="success" className="text-xs sm:text-sm px-2 sm:px-3 py-1 font-semibold flex-shrink-0 whitespace-nowrap">
+              {formatCurrency(payslip.net_salary)}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <div className="flex justify-between items-center p-2 rounded-lg border border-green-200/30 bg-card min-w-0">
+              <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">Gross</span>
+              <span className="font-semibold text-slate-900 dark:text-foreground text-xs sm:text-sm truncate text-right ml-1">{formatCurrency(payslip.gross_salary)}</span>
+            </div>
+            <div className="flex justify-between items-center p-2 rounded-lg border border-red-200/30 bg-card min-w-0">
+              <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">Deduct</span>
+              <span className="font-semibold text-red-600 text-xs sm:text-sm truncate text-right ml-1">{formatCurrency(payslip.total_deductions)}</span>
+            </div>
+            <div className="flex justify-between items-center p-2 rounded-lg border border-orange-200/30 bg-card min-w-0">
+              <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">PAYE</span>
+              <span className="font-medium text-slate-900 dark:text-foreground text-xs truncate text-right ml-1">{formatCurrency(payslip.paye_after_relief)}</span>
+            </div>
+            <div className="flex justify-between items-center p-2 rounded-lg border border-blue-200/30 bg-card min-w-0">
+              <span className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground font-medium truncate pr-1">NSSF</span>
+              <span className="font-medium text-slate-900 dark:text-foreground text-xs truncate text-right ml-1">{formatCurrency(payslip.nssf_employee)}</span>
             </div>
           </div>
-          <Badge variant="success" className="text-xs">
-            {formatCurrency(payslip.net_salary)}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Gross Salary</span>
-            <span className="font-medium">{formatCurrency(payslip.gross_salary)}</span>
+          
+          <Separator />
+          
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="flex-1 gap-2"
+              onClick={() => onView(payslip)}
+            >
+              <Eye className="h-4 w-4" />
+              View
+            </Button>
+            <Button size="sm" variant="outline" className="flex-1 gap-2" onClick={() => onExportPDF(payslip)}>
+              <Download className="h-4 w-4" />
+              PDF
+            </Button>
+            <Button size="sm" variant="outline" className="flex-1 gap-2" onClick={() => onExportExcel(payslip)}>
+              <FileText className="h-4 w-4" />
+              Excel
+            </Button>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Total Deductions</span>
-            <span className="font-medium text-red-600">{formatCurrency(payslip.total_deductions)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">PAYE</span>
-            <span className="text-xs">{formatCurrency(payslip.paye_after_relief)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">NSSF</span>
-            <span className="text-xs">{formatCurrency(payslip.nssf_employee)}</span>
-          </div>
-        </div>
-        
-        <Separator />
-        
-        <div className="flex gap-2">
-          <Button 
-            size="sm" 
-            variant="outline" 
-            className="flex-1"
-            onClick={() => onView(payslip)}
-          >
-            <Eye className="h-4 w-4 mr-1" />
-            View
-          </Button>
-          <Button size="sm" variant="outline" className="flex-1" onClick={() => onExportPDF(payslip)}>
-            <Download className="h-4 w-4 mr-1" />
-            PDF
-          </Button>
-          <Button size="sm" variant="outline" className="flex-1" onClick={() => onExportExcel(payslip)}>
-            <Download className="h-4 w-4 mr-1" />
-            Excel
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </motion.div>
   )
 }
 
 function PayslipTable({ data, onView, onExportPDF, onExportExcel }: { data: PayslipShape[]; onView: (p: PayslipShape) => void, onExportPDF: (p: PayslipShape) => void, onExportExcel: (p: PayslipShape) => void }) {
   return (
-    <Card className="hidden sm:block overflow-hidden min-w-0">
-      <CardHeader>
+    <Card className="hidden sm:block overflow-hidden min-w-0 border-2">
+      <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 border-b">
         <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
+          <div className="p-2 rounded-lg bg-primary/10">
+            <FileText className="h-5 w-5 text-primary" />
+          </div>
           Payslips
         </CardTitle>
         <CardDescription>Employee payslips for selected period</CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="rounded-md border">
+      <CardContent className="p-0">
+        <div className="rounded-md border-2 overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+              <tr className="border-b bg-card/50">
+                <th className="h-12 px-4 text-left align-middle font-semibold text-slate-700 dark:text-muted-foreground">
                   Employee
                 </th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                <th className="h-12 px-4 text-left align-middle font-semibold text-slate-700 dark:text-muted-foreground">
                   Period
                 </th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                <th className="h-12 px-4 text-left align-middle font-semibold text-slate-700 dark:text-muted-foreground">
                   Gross Salary
                 </th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                <th className="h-12 px-4 text-left align-middle font-semibold text-slate-700 dark:text-muted-foreground">
                   Net Salary
                 </th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                <th className="h-12 px-4 text-left align-middle font-semibold text-slate-700 dark:text-muted-foreground">
                   Status
                 </th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                <th className="h-12 px-4 text-left align-middle font-semibold text-slate-700 dark:text-muted-foreground">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody>
-              {data.map((payslip) => (
-                <tr key={payslip.id} className="border-b hover:bg-muted/50 transition-colors">
+              {data.map((payslip, index) => (
+                <motion.tr 
+                  key={payslip.id} 
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05, duration: 0.3 }}
+                  className="border-b hover:bg-card/80 transition-colors"
+                >
                   <td className="p-4">
                     <div className="flex items-center space-x-3">
-                      <div className="kenya-gradient w-8 h-8 rounded-lg flex items-center justify-center">
+                      <div className="kenya-gradient w-10 h-10 rounded-lg flex items-center justify-center shadow-md">
                         <span className="text-white font-bold text-sm">
                           {payslip.employee_name.split(' ').map((n: string) => n[0]).join('')}
                         </span>
                       </div>
                       <div>
-                        <div className="font-medium">{payslip.employee_name}</div>
-                        <div className="text-sm text-muted-foreground">{payslip.employee_id}</div>
+                        <div className="font-semibold text-slate-900 dark:text-foreground">{payslip.employee_name}</div>
+                        <div className="text-sm text-slate-600 dark:text-muted-foreground">{payslip.employee_id}</div>
                       </div>
                     </div>
                   </td>
                   <td className="p-4">
-                    <div className="text-sm">
+                    <div className="text-sm text-slate-900 dark:text-foreground font-medium">
                       {new Date(payslip.month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                     </div>
                   </td>
                   <td className="p-4">
-                    <div className="font-medium">{formatCurrency(payslip.gross_salary)}</div>
+                    <div className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(payslip.gross_salary)}</div>
                   </td>
                   <td className="p-4">
-                    <div className="font-semibold text-primary">{formatCurrency(payslip.net_salary)}</div>
+                    <div className="font-bold text-primary">{formatCurrency(payslip.net_salary)}</div>
                   </td>
                   <td className="p-4">
-                    <Badge variant="success" className="text-xs">Generated</Badge>
+                    <Badge variant="success" className="text-xs">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Generated
+                    </Badge>
                   </td>
                   <td className="p-4">
                     <div className="flex gap-2">
@@ -195,18 +220,19 @@ function PayslipTable({ data, onView, onExportPDF, onExportExcel }: { data: Pays
                         size="sm" 
                         variant="outline"
                         onClick={() => onView(payslip)}
+                        className="hover:bg-primary/5"
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => onExportPDF(payslip)}>
+                      <Button size="sm" variant="outline" onClick={() => onExportPDF(payslip)} className="hover:bg-primary/5">
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => onExportExcel(payslip)}>
-                        <Download className="h-4 w-4" />
+                      <Button size="sm" variant="outline" onClick={() => onExportExcel(payslip)} className="hover:bg-primary/5">
+                        <FileText className="h-4 w-4" />
                       </Button>
                     </div>
                   </td>
-                </tr>
+                </motion.tr>
               ))}
             </tbody>
           </table>
@@ -216,213 +242,269 @@ function PayslipTable({ data, onView, onExportPDF, onExportExcel }: { data: Pays
   )
 }
 
-function PayslipViewer({ payslip }: { payslip: typeof mockPayslips[0] }) {
+function PayslipViewer({ payslip }: { payslip: PayslipShape }) {
   return (
-    <Card className="max-w-4xl mx-auto overflow-hidden min-w-0 w-full">
-      <CardHeader className="text-center border-b">
-        <div className="kenya-gradient w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <span className="text-white font-bold text-2xl">P</span>
-        </div>
-        <CardTitle className="text-2xl">PEMWA PAYROLL SYSTEM</CardTitle>
-        <CardDescription className="text-lg">Monthly Payslip</CardDescription>
-        <div className="flex justify-between items-center mt-4">
-          <div className="text-left">
-            <p className="font-medium">{payslip.employee_name}</p>
-            <p className="text-sm text-muted-foreground">{payslip.employee_id}</p>
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3 }}
+    >
+      <Card className="max-w-4xl mx-auto overflow-hidden min-w-0 w-full border-2 shadow-xl">
+        <CardHeader className="text-center border-b-2 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
+          <div className="kenya-gradient w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <FileText className="h-10 w-10 text-white" />
           </div>
-          <div className="text-right">
-            <p className="font-medium">
-              {new Date(payslip.month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </p>
-            <p className="text-sm text-muted-foreground">Pay Period</p>
+          <CardTitle className="text-3xl font-bold mb-2">PEMWA PAYROLL SYSTEM</CardTitle>
+          <CardDescription className="text-lg font-semibold">Monthly Payslip</CardDescription>
+          <div className="flex justify-between items-center mt-6 pt-4 border-t px-4 gap-4">
+            <div className="text-left min-w-0 flex-1">
+              <p className="font-bold text-lg truncate text-slate-900 dark:text-foreground">{payslip.employee_name}</p>
+              <p className="text-sm text-slate-600 dark:text-muted-foreground truncate">{payslip.employee_id}</p>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="font-medium text-slate-900 dark:text-foreground">
+                {new Date(payslip.month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </p>
+              <p className="text-sm text-slate-600 dark:text-muted-foreground">Pay Period</p>
+            </div>
           </div>
-        </div>
-      </CardHeader>
+        </CardHeader>
       
-      <CardContent className="space-y-6">
-        {/* Earnings */}
-        <div>
-          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Earnings
-          </h3>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span>Basic Salary</span>
-              <span>{formatCurrency(payslip.basic_salary)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Allowances</span>
-              <span>{formatCurrency(payslip.allowances_total)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Overtime</span>
-              <span>{formatCurrency(payslip.overtime)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Bonuses</span>
-              <span>{formatCurrency(payslip.bonuses)}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between font-semibold text-lg">
-              <span>Gross Salary</span>
-              <span>{formatCurrency(payslip.gross_salary)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Deductions */}
-        <div>
-          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
-            Deductions
-          </h3>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span>NSSF (Employee)</span>
-              <span>{formatCurrency(payslip.nssf_employee)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>SHIF (Employee)</span>
-              <span>{formatCurrency(payslip.shif_employee)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>AHL (Employee)</span>
-              <span>{formatCurrency(payslip.ahl_employee)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>PAYE</span>
-              <span>{formatCurrency(payslip.paye_after_relief)}</span>
-            </div>
-            {payslip.helb > 0 && (
-              <div className="flex justify-between">
-                <span>HELB</span>
-                <span>{formatCurrency(payslip.helb)}</span>
+        <CardContent className="space-y-6 pt-6">
+          {/* Earnings */}
+          <Card className="border-2">
+            <CardHeader className="bg-gradient-to-r from-green-500/10 to-green-600/5 border-b">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <div className="p-2 rounded-lg bg-green-500/10">
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                </div>
+                Earnings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 rounded-lg border border-green-200/30 bg-card">
+                  <span className="text-sm text-slate-700 dark:text-muted-foreground font-medium">Basic Salary</span>
+                  <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(payslip.basic_salary)}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 rounded-lg border border-green-200/30 bg-card">
+                  <span className="text-sm text-slate-700 dark:text-muted-foreground font-medium">Allowances</span>
+                  <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(payslip.allowances_total)}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 rounded-lg border border-green-200/30 bg-card">
+                  <span className="text-sm text-slate-700 dark:text-muted-foreground font-medium">Overtime</span>
+                  <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(payslip.overtime)}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 rounded-lg border border-green-200/30 bg-card">
+                  <span className="text-sm text-slate-700 dark:text-muted-foreground font-medium">Bonuses</span>
+                  <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(payslip.bonuses)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center p-5 rounded-lg bg-gradient-to-r from-green-500/10 to-green-600/5 border-2 border-green-300/50">
+                  <span className="text-lg font-bold text-slate-900 dark:text-foreground">Gross Salary</span>
+                  <span className="text-xl font-bold text-green-600">{formatCurrency(payslip.gross_salary)}</span>
+                </div>
               </div>
-            )}
-            {payslip.voluntary_deductions_total > 0 && (
-              <div className="flex justify-between">
-                <span>Voluntary Deductions</span>
-                <span>{formatCurrency(payslip.voluntary_deductions_total)}</span>
-              </div>
-            )}
-            <Separator />
-            <div className="flex justify-between font-semibold text-lg text-red-600">
-              <span>Total Deductions</span>
-              <span>{formatCurrency(payslip.total_deductions)}</span>
-            </div>
-          </div>
-        </div>
+            </CardContent>
+          </Card>
 
-        {/* Net Pay */}
-        <div className="bg-primary/5 p-4 rounded-lg">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-lg font-semibold">Net Salary</h3>
-              <p className="text-sm text-muted-foreground">Amount to be paid</p>
-            </div>
-            <div className="text-right">
-              <div className="text-xl font-bold text-primary">
-                {formatCurrency(payslip.net_salary)}
+          {/* Deductions */}
+          <Card className="border-2">
+            <CardHeader className="bg-gradient-to-r from-red-500/10 to-red-600/5 border-b">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <div className="p-2 rounded-lg bg-red-500/10">
+                  <Calculator className="h-5 w-5 text-red-600" />
+                </div>
+                Deductions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 rounded-lg border border-red-200/30 bg-card">
+                  <span className="text-sm text-slate-700 dark:text-muted-foreground font-medium flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-blue-500" />
+                    NSSF (Employee)
+                  </span>
+                  <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(payslip.nssf_employee)}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 rounded-lg border border-red-200/30 bg-card">
+                  <span className="text-sm text-slate-700 dark:text-muted-foreground font-medium flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-orange-500" />
+                    SHIF (Employee)
+                  </span>
+                  <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(payslip.shif_employee)}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 rounded-lg border border-red-200/30 bg-card">
+                  <span className="text-sm text-slate-700 dark:text-muted-foreground font-medium flex items-center gap-2">
+                    <Home className="h-4 w-4 text-purple-500" />
+                    AHL (Employee)
+                  </span>
+                  <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(payslip.ahl_employee)}</span>
+                </div>
+                <div className="flex justify-between items-center p-4 rounded-lg border-2 border-red-300/50 bg-card">
+                  <span className="font-semibold flex items-center gap-2 text-slate-900 dark:text-foreground">
+                    <Calculator className="h-5 w-5 text-red-600" />
+                    PAYE
+                  </span>
+                  <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(payslip.paye_after_relief)}</span>
+                </div>
+                {payslip.helb > 0 && (
+                  <div className="flex justify-between items-center p-3 rounded-lg border border-red-200/30 bg-card">
+                    <span className="text-sm text-slate-700 dark:text-muted-foreground font-medium">HELB</span>
+                    <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(payslip.helb)}</span>
+                  </div>
+                )}
+                {payslip.voluntary_deductions_total > 0 && (
+                  <div className="flex justify-between items-center p-3 rounded-lg border border-red-200/30 bg-card">
+                    <span className="text-sm text-slate-700 dark:text-muted-foreground font-medium">Voluntary Deductions</span>
+                    <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(payslip.voluntary_deductions_total)}</span>
+                  </div>
+                )}
+                <Separator />
+                <div className="flex justify-between items-center p-5 rounded-lg bg-gradient-to-r from-red-500/10 to-red-600/5 border-2 border-red-300/50">
+                  <span className="text-lg font-bold text-slate-900 dark:text-foreground">Total Deductions</span>
+                  <span className="text-xl font-bold text-red-600">{formatCurrency(payslip.total_deductions)}</span>
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
+            </CardContent>
+          </Card>
 
-        {/* Employer Contributions */}
-        <div>
-          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            Employer Contributions
-          </h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span>NSSF (Employer)</span>
-              <span>{formatCurrency(payslip.nssf_employer)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>SHIF (Employer)</span>
-              <span>{formatCurrency(payslip.shif_employer)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>AHL (Employer)</span>
-              <span>{formatCurrency(payslip.ahl_employer)}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between font-semibold">
-              <span>Total Employer Cost</span>
-              <span>{formatCurrency(payslip.total_employer_cost)}</span>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+          {/* Net Pay */}
+          <Card className="border-2 border-green-400/50 bg-gradient-to-br from-green-500/10 to-green-600/5">
+            <CardContent className="pt-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-bold mb-1 text-slate-900 dark:text-foreground">Net Salary</h3>
+                  <p className="text-sm text-slate-600 dark:text-muted-foreground">Amount to be paid</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-3xl font-bold text-green-600">
+                    {formatCurrency(payslip.net_salary)}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Employer Contributions */}
+          <Card className="border-2">
+            <CardHeader className="bg-gradient-to-r from-blue-500/10 to-blue-600/5 border-b">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <div className="p-2 rounded-lg bg-blue-500/10">
+                  <Building2 className="h-5 w-5 text-blue-600" />
+                </div>
+                Employer Contributions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 rounded-lg border border-blue-200/30 bg-card">
+                  <span className="text-sm text-slate-700 dark:text-muted-foreground font-medium">NSSF (Employer)</span>
+                  <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(payslip.nssf_employer)}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 rounded-lg border border-amber-300/40 border-dashed bg-card/50">
+                  <span className="text-sm italic text-slate-700 dark:text-muted-foreground font-medium flex items-center gap-2">
+                    <Info className="h-4 w-4" />
+                    SHIF (Employer)
+                  </span>
+                  <span className="font-semibold italic text-slate-900 dark:text-foreground">N/A</span>
+                </div>
+                <div className="flex justify-between items-center p-3 rounded-lg border border-purple-200/30 bg-card">
+                  <span className="text-sm text-slate-700 dark:text-muted-foreground font-medium flex items-center gap-2">
+                    <Home className="h-4 w-4 text-purple-500" />
+                    AHL (Employer)
+                  </span>
+                  <span className="font-semibold text-slate-900 dark:text-foreground">{formatCurrency(payslip.ahl_employer)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center p-5 rounded-lg bg-gradient-to-r from-blue-500/10 to-blue-600/5 border-2 border-blue-300/50">
+                  <span className="text-lg font-bold text-slate-900 dark:text-foreground">Total Employer Cost</span>
+                  <span className="text-xl font-bold text-blue-600">{formatCurrency(payslip.total_employer_cost)}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </CardContent>
+      </Card>
+    </motion.div>
   )
 }
 
 export default function PayslipsPage() {
   const { shouldExpand } = useSidebar()
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedMonth, setSelectedMonth] = useState('')
-  const [selectedEmployee, setSelectedEmployee] = useState('')
-  const { data: employees, isLoading: isEmployeesLoading } = useEmployees()
-  const { data: settings, isLoading: isSettingsLoading } = usePayrollSettings()
+  // Default to current month instead of empty string
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7))
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
+  const { data: employees } = useEmployees()
+  // Always require a month - only fetch when month is selected
+  const { data: payslipsData, isLoading: isPayslipsLoading, error: payslipsError } = usePayslips(
+    selectedEmployeeId || undefined, 
+    selectedMonth || undefined
+  )
   const [viewingPayslip, setViewingPayslip] = useState<PayslipShape | null>(null)
 
-  const payslips = useMemo<PayslipShape[]>(() => {
-    if (!employees || !settings) return []
-    const month = selectedMonth || new Date().toISOString().slice(0, 7)
-    return employees.map((emp) => {
-      const calc = calculatePayroll(
-        { id: emp.id, basic_salary: emp.basic_salary, helb_amount: emp.helb_amount } as any,
-        emp.allowances as any,
-        emp.voluntary_deductions as any,
-        0,
-        0,
-        settings as any
-      )
-      return {
-        id: emp.id,
-        employee_id: emp.employee_id,
-        employee_name: emp.name,
-        month,
-        gross_salary: calc.grossSalary,
-        basic_salary: emp.basic_salary,
-        allowances_total: calc.allowancesTotal,
-        overtime: calc.overtime,
-        bonuses: calc.bonuses,
-        nssf_employee: calc.nssfEmployee,
-        nssf_employer: calc.nssfEmployer,
-        shif_employee: calc.shifEmployee,
-        shif_employer: calc.shifEmployer,
-        ahl_employee: calc.ahlEmployee,
-        ahl_employer: calc.ahlEmployer,
-        helb: calc.helb,
-        voluntary_deductions_total: calc.voluntaryDeductionsTotal,
-        paye_before_relief: calc.payeBeforeRelief,
-        personal_relief: calc.personalRelief,
-        paye_after_relief: calc.payeAfterRelief,
-        total_deductions: calc.totalDeductions,
-        net_salary: calc.netSalary,
-        total_employer_cost: calc.totalEmployerCost,
-        created_at: new Date().toISOString(),
+  // Scroll to top when viewing a payslip
+  useEffect(() => {
+    if (viewingPayslip) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      document.documentElement.scrollTop = 0
+      document.body.scrollTop = 0
+      const mainElement = document.querySelector('main')
+      if (mainElement) {
+        mainElement.scrollTop = 0
       }
-    })
-  }, [employees, settings, selectedMonth])
+    }
+  }, [viewingPayslip])
 
-  const employeeOptions = payslips.map(payslip => ({
-    value: payslip.employee_id,
-    label: payslip.employee_name
+  const payslips: PayslipShape[] = React.useMemo(() => {
+    if (!payslipsData) return []
+    return payslipsData.map((p: any) => ({
+      id: p.id,
+      employee_id: p.employee_id || '',
+      employee_name: p.employee_name || '',
+      month: p.month || '',
+      gross_salary: Number(p.gross_salary) || 0,
+      basic_salary: Number(p.basic_salary) || 0,
+      allowances_total: Number(p.allowances_total) || 0,
+      overtime: Number(p.overtime) || 0,
+      bonuses: Number(p.bonuses) || 0,
+      nssf_employee: Number(p.nssf_employee) || 0,
+      nssf_employer: Number(p.nssf_employer) || 0,
+      shif_employee: Number(p.shif_employee) || 0,
+      shif_employer: Number(p.shif_employer) || 0,
+      ahl_employee: Number(p.ahl_employee) || 0,
+      ahl_employer: Number(p.ahl_employer) || 0,
+      helb: Number(p.helb) || 0,
+      voluntary_deductions_total: Number(p.voluntary_deductions_total) || 0,
+      paye_before_relief: Number(p.paye_before_relief) || 0,
+      personal_relief: Number(p.personal_relief) || 0,
+      paye_after_relief: Number(p.paye_after_relief) || 0,
+      total_deductions: Number(p.total_deductions) || 0,
+      net_salary: Number(p.net_salary) || 0,
+      total_employer_cost: Number(p.total_employer_cost) || 0,
+      created_at: p.created_at || new Date().toISOString(),
+    }))
+  }, [payslipsData])
+
+  const employeeOptions = (employees ?? []).map(emp => ({
+    value: emp.id,
+    label: `${emp.name} (${emp.employee_id})`
   }))
 
-  const filteredPayslips = payslips.filter(payslip => {
-    const matchesSearch = payslip.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         payslip.employee_id.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesMonth = !selectedMonth || payslip.month === selectedMonth
-    const matchesEmployee = !selectedEmployee || payslip.employee_id === selectedEmployee
-    
-    return matchesSearch && matchesMonth && matchesEmployee
-  })
+  const filteredPayslips = useMemo(() => {
+    return payslips.filter(payslip => {
+      // Filter by month if selected (safety check - API should already filter)
+      const matchesMonth = !selectedMonth || payslip.month === selectedMonth || payslip.month.slice(0, 7) === selectedMonth
+      
+      // Filter by search term
+      const matchesSearch = !searchTerm || 
+        payslip.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        payslip.employee_id.toLowerCase().includes(searchTerm.toLowerCase())
+      
+      return matchesMonth && matchesSearch
+    })
+  }, [payslips, selectedMonth, searchTerm])
 
   if (viewingPayslip) {
     return (
@@ -502,38 +584,41 @@ export default function PayslipsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background w-full overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 w-full overflow-x-hidden">
       {/* Mobile Header */}
-      <div className="sm:hidden px-4 py-6 border-b bg-card/50">
+      <div className="sm:hidden px-4 py-6 border-b bg-card/80 backdrop-blur-sm">
         <div className="flex items-center justify-between min-w-0">
           <div className="min-w-0 flex-1">
             <h1 className="text-lg font-bold truncate">Payslips</h1>
             <p className="text-[12px] text-muted-foreground truncate">View employee payslips</p>
           </div>
-          <div className="kenya-gradient w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ml-2">
+          <div className="kenya-gradient w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ml-2 shadow-lg">
             <FileText className="h-5 w-5 text-white" />
           </div>
         </div>
       </div>
 
       {/* Desktop Header */}
-      <div className="hidden sm:block px-4 sm:px-6 py-6 border-b bg-card/50">
+      <div className={cn(
+        "hidden sm:block px-4 sm:px-6 py-6 border-b bg-card/80 backdrop-blur-sm transition-all duration-300",
+        shouldExpand ? "sm:px-4" : "sm:px-6"
+      )}>
         <div className="flex items-center justify-between min-w-0">
           <div className="min-w-0 flex-1">
             <h1 className={cn(
               "font-bold transition-all duration-300",
-              shouldExpand ? "text-xl" : "text-xl"
+              shouldExpand ? "text-xl" : "text-2xl"
             )}>
               Payslips
             </h1>
             <p className={cn(
-              "text-muted-foreground transition-all duration-300 truncate",
-              shouldExpand ? "text-sm" : "text-base"
+              "text-muted-foreground transition-all duration-300 mt-1",
+              shouldExpand ? "text-xs" : "text-sm"
             )}>
-              View and export employee payslips
+              View and export employee monthly payslips
             </p>
           </div>
-          <div className="kenya-gradient w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ml-4">
+          <div className="kenya-gradient w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ml-4 shadow-lg">
             <FileText className="h-6 w-6 text-white" />
           </div>
         </div>
@@ -546,15 +631,17 @@ export default function PayslipsPage() {
         shouldExpand ? "sm:px-4" : "sm:px-6"
       )}>
         {/* Filters */}
-        <Card>
-          <CardHeader>
+        <Card className="border-2">
+          <CardHeader className="bg-gradient-to-r from-blue-500/10 to-blue-600/5 border-b">
             <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
+              <div className="p-2 rounded-lg bg-blue-500/10">
+                <Filter className="h-5 w-5 text-blue-600" />
+              </div>
               Filter Payslips
             </CardTitle>
             <CardDescription>Search and filter payslips by employee and period</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pt-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Search Employee</Label>
@@ -569,42 +656,111 @@ export default function PayslipsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Payroll Month</Label>
-                <Input
-                  type="month"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                />
+                <Label className="text-base font-semibold">Payroll Month *</Label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    type="month"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="pl-10 h-11 font-medium"
+                    required
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Select a month to view payslips for that period</p>
               </div>
               <div className="space-y-2">
                 <Label>Employee</Label>
                 <Combobox
                   options={employeeOptions}
-                  value={selectedEmployee}
-                  onValueChange={setSelectedEmployee}
-                  placeholder="Select employee..."
+                  value={selectedEmployeeId}
+                  onValueChange={setSelectedEmployeeId}
+                  placeholder="All employees"
                 />
               </div>
             </div>
             
-            <div className="flex gap-2">
-              <Badge variant="secondary" className="text-sm">
-                {filteredPayslips.length} payslips found
+            <div className="flex flex-wrap gap-3 pt-2">
+              <Badge variant="secondary" className="text-sm px-4 py-2">
+                <FileText className="h-3 w-3 mr-1" />
+                {filteredPayslips.length} payslip{filteredPayslips.length !== 1 ? 's' : ''} found
               </Badge>
-              <Badge variant="outline" className="text-sm">
+              {selectedMonth && (
+                <Badge variant="outline" className="text-sm px-4 py-2">
+                  <Calendar className="h-3 w-3 mr-1" />
+                  {new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </Badge>
+              )}
+              <Badge variant="outline" className="text-sm px-4 py-2">
+                <DollarSign className="h-3 w-3 mr-1" />
                 Total: {formatCurrency(filteredPayslips.reduce((sum, p) => sum + p.net_salary, 0))}
               </Badge>
             </div>
           </CardContent>
         </Card>
 
+        {/* Loading State */}
+        {isPayslipsLoading && (
+          <Card className="border-2">
+            <CardContent className="p-8 text-center">
+              <div className="flex items-center justify-center gap-2">
+                <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full" />
+                <span>Loading payslips...</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Error State */}
+        {payslipsError && (
+          <Card className="border-2 border-red-300 bg-red-50">
+            <CardContent className="p-8 text-center">
+              <p className="text-red-600">Error loading payslips: {payslipsError.message}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Empty State */}
+        {!isPayslipsLoading && !payslipsError && filteredPayslips.length === 0 && (
+          <Card className="border-2 text-center py-12">
+            <CardContent>
+              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No payslips found</h3>
+              <p className="text-muted-foreground mb-4">
+                {selectedMonth
+                  ? `No payslips available for ${new Date(selectedMonth + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}. ${selectedEmployeeId ? 'Try a different employee or ' : ''}Process payroll for this month to create payslips.`
+                  : 'Please select a month to view payslips.'}
+              </p>
+              {selectedMonth && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setSelectedEmployeeId('')
+                    setSearchTerm('')
+                  }}
+                  className="mt-4"
+                >
+                  Clear Employee Filter
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Mobile Cards */}
+        {!isPayslipsLoading && filteredPayslips.length > 0 && (
         <div className="sm:hidden space-y-4">
           {filteredPayslips.map((payslip) => (
             <PayslipCard 
               key={payslip.id} 
               payslip={payslip}
-              onView={(p) => setViewingPayslip(p)}
+              onView={(p) => {
+                setViewingPayslip(p)
+                // Scroll to top when viewing payslip
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+                document.documentElement.scrollTop = 0
+                document.body.scrollTop = 0
+              }}
               onExportPDF={(d) => generatePayslipPDF({
                 employee: { name: d.employee_name, employee_id: d.employee_id },
                 month: d.month,
@@ -650,8 +806,10 @@ export default function PayslipsPage() {
             />
           ))}
         </div>
+        )}
 
         {/* Desktop Table */}
+        {!isPayslipsLoading && filteredPayslips.length > 0 && (
         <PayslipTable 
           data={filteredPayslips}
           onView={(p) => setViewingPayslip(p)}
@@ -698,24 +856,6 @@ export default function PayslipsPage() {
             total_employer_cost: d.total_employer_cost,
           })}
         />
-
-        {/* Empty State */}
-        {filteredPayslips.length === 0 && (
-          <Card className="text-center py-12">
-            <CardContent>
-              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No payslips found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchTerm || selectedMonth || selectedEmployee 
-                  ? 'Try adjusting your search criteria' 
-                  : 'No payslips have been generated yet'}
-              </p>
-              <Button className="kenya-gradient text-white hover:opacity-90">
-                <Calendar className="h-4 w-4 mr-2" />
-                Run Payroll
-              </Button>
-            </CardContent>
-          </Card>
         )}
       </div>
     </div>

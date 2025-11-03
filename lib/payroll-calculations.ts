@@ -41,31 +41,40 @@ export const calculatePayroll = (
   const grossSalary = employee.basic_salary + allowancesTotal + bonuses + overtime
 
   // NSSF calculations (capped at maximum contribution)
-  const nssfEmployee = Math.min(grossSalary * settings.nssf_employee_rate, settings.nssf_max_contribution)
-  const nssfEmployer = Math.min(grossSalary * settings.nssf_employer_rate, settings.nssf_max_contribution)
+  // Ensure rates are valid numbers, default to 0 if invalid
+  const nssfEmployeeRate = typeof settings.nssf_employee_rate === 'number' ? settings.nssf_employee_rate : 0
+  const nssfEmployerRate = typeof settings.nssf_employer_rate === 'number' ? settings.nssf_employer_rate : 0
+  const nssfMaxContribution = typeof settings.nssf_max_contribution === 'number' ? settings.nssf_max_contribution : 0
+  
+  const nssfEmployee = Math.min(grossSalary * nssfEmployeeRate, nssfMaxContribution)
+  const nssfEmployer = Math.min(grossSalary * nssfEmployerRate, nssfMaxContribution)
 
-  // SHIF (Social Health Insurance Fund) - 2.75% each
-  const shifEmployee = grossSalary * settings.shif_employee_rate
-  const shifEmployer = grossSalary * settings.shif_employer_rate
+  // SHIF (Social Health Insurance Fund) - employee only (employer does NOT pay)
+  // Always set employer rate to 0 regardless of settings value
+  const shifEmployeeRate = typeof settings.shif_employee_rate === 'number' ? settings.shif_employee_rate : 0
+  const shifEmployee = grossSalary * shifEmployeeRate
+  const shifEmployer = 0 // Employer does NOT pay SHIF (enforced, not from settings)
 
-  // AHL (Affordable Housing Levy) - 1.5% each
-  const ahlEmployee = grossSalary * settings.ahl_employee_rate
-  const ahlEmployer = grossSalary * settings.ahl_employer_rate
+  // AHL (Affordable Housing Levy) - 1.5% each (employee AND employer both pay, totaling 3%)
+  const ahlEmployeeRate = typeof settings.ahl_employee_rate === 'number' ? settings.ahl_employee_rate : 0
+  const ahlEmployerRate = typeof settings.ahl_employer_rate === 'number' ? settings.ahl_employer_rate : 0
+  const ahlEmployee = grossSalary * ahlEmployeeRate
+  const ahlEmployer = grossSalary * ahlEmployerRate
 
   // HELB (from employee record)
   const helb = employee.helb_amount || 0
 
   // Taxable income (gross - employee NSSF - employee SHIF)
-  const taxableIncome = grossSalary - nssfEmployee - shifEmployee
+  const taxableIncome = Math.max(0, grossSalary - nssfEmployee - shifEmployee)
 
   // PAYE calculation using progressive tax brackets
   const payeBeforeRelief = calculatePAYE(taxableIncome, settings)
 
-  // Personal relief (standard 2,400 KES)
-  const personalRelief = settings.personal_relief
+  // Personal relief
+  const personalRelief = typeof settings.personal_relief === 'number' ? settings.personal_relief : 0
 
-  // PAYE after relief
-  const payeAfterRelief = Math.max(payeBeforeRelief - personalRelief, 0)
+  // PAYE after relief (cannot be negative)
+  const payeAfterRelief = Math.max(0, payeBeforeRelief - personalRelief)
 
   // Total deductions
   const totalDeductions = nssfEmployee + shifEmployee + ahlEmployee + helb + voluntaryDeductionsTotal + payeAfterRelief
@@ -73,8 +82,8 @@ export const calculatePayroll = (
   // Net salary
   const netSalary = grossSalary - totalDeductions
 
-  // Total employer cost
-  const totalEmployerCost = grossSalary + nssfEmployer + shifEmployer + ahlEmployer
+  // Total employer cost (NSSF + AHL, but NOT SHIF)
+  const totalEmployerCost = grossSalary + nssfEmployer + ahlEmployer
 
   return {
     grossSalary,
@@ -101,22 +110,38 @@ export const calculatePayroll = (
 }
 
 const calculatePAYE = (taxableIncome: number, settings: PayrollSettings): number => {
+  if (taxableIncome <= 0) return 0
+  
+  // Ensure brackets are sorted by min value (ascending)
+  const sortedBrackets = [...settings.paye_brackets].sort((a, b) => a.min - b.min)
+  
   let paye = 0
   let remainingIncome = taxableIncome
 
-  for (const bracket of settings.paye_brackets) {
+  for (const bracket of sortedBrackets) {
     if (remainingIncome <= 0) break
+    
+    const bracketMin = bracket.min || 0
+    const bracketMax = bracket.max === null ? Infinity : bracket.max
+    
+    // Skip if income is below this bracket's minimum
+    if (remainingIncome <= bracketMin) break
 
-    const taxableInBracket = Math.min(
-      remainingIncome,
-      bracket.max === null ? remainingIncome : bracket.max - bracket.min + 1
-    )
-
-    paye += taxableInBracket * bracket.rate
-    remainingIncome -= taxableInBracket
+    // Calculate the amount of income that falls within this bracket
+    const bracketStart = Math.max(bracketMin, 0)
+    const bracketEnd = bracketMax === null ? remainingIncome : Math.min(bracketMax, remainingIncome)
+    
+    // Calculate taxable amount in this bracket
+    const taxableInBracket = Math.max(0, bracketEnd - bracketStart + (bracketStart === 0 ? 0 : 1))
+    const actualTaxable = Math.min(taxableInBracket, remainingIncome)
+    
+    if (actualTaxable > 0) {
+      paye += actualTaxable * (bracket.rate || 0)
+      remainingIncome -= actualTaxable
+    }
   }
 
-  return paye
+  return Math.max(0, paye)
 }
 
 // Reuse a single Intl.NumberFormat instance for performance
@@ -145,6 +170,3 @@ export const getMonthName = (month: string | Date): string => {
     year: 'numeric',
   }).format(new Date(month))
 }
-
-// Helper function to get default 2025 Kenyan payroll settings
-// Default settings are not hardcoded; all settings are fetched from the database.

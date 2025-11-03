@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,32 @@ const EmployeeDetails: React.FC = () => {
   const { data: employees } = useEmployees()
   const { data: settings } = usePayrollSettings()
   const employee = useMemo(() => (employees || []).find(e => e.id === id), [employees, id])
+
+  // Scroll to top when this detail page opens
+  useEffect(() => {
+    // Immediate scroll to top
+    window.scrollTo(0, 0)
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+    
+    // Also scroll any parent containers
+    const mainElement = document.querySelector('main')
+    if (mainElement) {
+      mainElement.scrollTop = 0
+    }
+    
+    // Ensure scroll after a brief delay (in case content is still loading)
+    const timeout = setTimeout(() => {
+      window.scrollTo(0, 0)
+      document.documentElement.scrollTop = 0
+      document.body.scrollTop = 0
+      if (mainElement) {
+        mainElement.scrollTop = 0
+      }
+    }, 100)
+    
+    return () => clearTimeout(timeout)
+  }, [id]) // Re-run when the employee ID changes
 
   if (!employee || !settings) {
     return (

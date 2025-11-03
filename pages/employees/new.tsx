@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { useNextEmployeeId } from '@/hooks/useNextEmployeeId'
 import { useSidebar } from '@/contexts/sidebar-context'
 import { useToast } from '@/hooks/use-toast'
+import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -153,6 +154,7 @@ function AllowanceField({
 function EmployeeForm() {
   const router = useRouter()
   const { toast } = useToast()
+  const queryClient = useQueryClient()
   const { data: nextEmployeeId } = useNextEmployeeId()
   const [formData, setFormData] = useState<EmployeeFormData>(initialFormData)
   const [isSaving, setIsSaving] = useState(false)
@@ -230,6 +232,13 @@ function EmployeeForm() {
         const data = await res.json()
         throw new Error(data?.error || 'Failed to save employee')
       }
+      
+      // Invalidate and refetch employees query immediately
+      await queryClient.invalidateQueries({ queryKey: ['employees'] })
+      await queryClient.refetchQueries({ queryKey: ['employees'], type: 'active' })
+      // Also invalidate dashboard stats since employee count changed
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      await queryClient.refetchQueries({ queryKey: ['dashboard-stats'], type: 'active' })
       
       toast({
         title: 'Success!',

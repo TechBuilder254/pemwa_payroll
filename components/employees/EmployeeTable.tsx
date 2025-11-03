@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Users, Eye, Edit, Trash2 } from 'lucide-react'
-import { calculatePayroll, formatCurrency } from '@/lib/payroll-calculations'
+import { formatCurrency } from '@/lib/payroll-calculations'
 
 export interface EmployeeLite {
   id: string
@@ -17,24 +17,7 @@ export interface EmployeeLite {
   voluntary_deductions: Record<string, number | undefined>
 }
 
-export interface PayrollSettingsLike {
-  id: string
-  created_at: string
-  personal_relief: number
-  nssf_employee_rate: number
-  nssf_employer_rate: number
-  nssf_max_contribution: number
-  shif_employee_rate: number
-  shif_employer_rate: number
-  ahl_employee_rate: number
-  ahl_employer_rate: number
-  paye_brackets: Array<{ min: number; max: number | null; rate: number }>
-  effective_from: string
-  effective_to: string | null
-  is_active: boolean
-}
-
-export function EmployeeTable({ employees, settings, onView, onEdit, onDelete }: { employees: EmployeeLite[]; settings: PayrollSettingsLike, onView: (e: EmployeeLite) => void, onEdit: (e: EmployeeLite) => void, onDelete: (e: EmployeeLite) => void }) {
+export function EmployeeTable({ employees, onView, onEdit, onDelete }: { employees: EmployeeLite[]; onView: (e: EmployeeLite) => void, onEdit: (e: EmployeeLite) => void, onDelete: (e: EmployeeLite) => void }) {
   const { shouldExpand } = useSidebar()
 
   return (
@@ -59,8 +42,6 @@ export function EmployeeTable({ employees, settings, onView, onEdit, onDelete }:
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Position</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Basic Salary</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Gross Salary</th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Net Salary</th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
                 <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[150px]">Actions</th>
               </tr>
             </thead>
@@ -68,19 +49,6 @@ export function EmployeeTable({ employees, settings, onView, onEdit, onDelete }:
               {employees.map((employee, index) => {
                 const totalAllowances = Object.values(employee.allowances).reduce((sum: number, amount: any) => sum + (amount || 0), 0)
                 const grossSalary = employee.basic_salary + totalAllowances
-
-                const calculation = calculatePayroll(
-                  {
-                    id: employee.id,
-                    basic_salary: employee.basic_salary,
-                    helb_amount: employee.helb_amount,
-                  } as any,
-                  employee.allowances as any,
-                  employee.voluntary_deductions as any,
-                  0,
-                  0,
-                  settings as any
-                )
 
                 return (
                   <tr key={employee.id} className="border-b hover:bg-muted/50 transition-colors">
@@ -116,16 +84,6 @@ export function EmployeeTable({ employees, settings, onView, onEdit, onDelete }:
                       <div className="font-semibold text-primary truncate" title={formatCurrency(grossSalary)}>
                         {formatCurrency(grossSalary)}
                       </div>
-                    </td>
-                    <td className="p-4 min-w-0">
-                      <div className="font-semibold text-green-600 truncate" title={formatCurrency(calculation.netSalary)}>
-                        {formatCurrency(calculation.netSalary)}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <Badge variant="success" className="text-xs flex-shrink-0">
-                        Active
-                      </Badge>
                     </td>
                     <td className="p-4">
                       <div className="flex justify-end gap-2">
