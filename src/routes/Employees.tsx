@@ -23,6 +23,7 @@ import { useEmployees } from '@/hooks/useEmployees'
 import { usePayrollSettings } from '@/hooks/usePayrollSettings'
 import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/use-toast'
+import { deleteEmployee } from '@/lib/api'
 import EmployeeTable from '@/components/employees/EmployeeTable'
 
 function EmployeeCard({ employee, settings }: { employee: any; settings: any }) {
@@ -329,14 +330,15 @@ const Employees: React.FC = () => {
             onDelete={async (e: any) => {
               if (!confirm(`Delete ${e.name} (${e.employee_id})? This cannot be undone.`)) return
               try {
-                const { error } = await import('@/lib/supabase').then(({ supabase }) => supabase
-                  .from('employees')
-                  .delete()
-                  .eq('id', e.id)
-                )
-                if (error) throw new Error(error.message)
+                await deleteEmployee(e.id)
                 toast({ title: 'Employee deleted', description: `${e.name} removed.` })
-                await queryClient.invalidateQueries({ queryKey: ['employees'] })
+                // Invalidate and refetch to update the list immediately
+                queryClient.invalidateQueries({ queryKey: ['employees'] })
+                queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+                await Promise.all([
+                  queryClient.refetchQueries({ queryKey: ['employees'] }),
+                  queryClient.refetchQueries({ queryKey: ['dashboard-stats'] }),
+                ])
               } catch (err: any) {
                 toast({ title: 'Delete failed', description: err?.message || 'Could not delete employee', variant: 'destructive' })
               }

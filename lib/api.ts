@@ -18,6 +18,17 @@ export async function createEmployee(payload: Partial<Employee>): Promise<Employ
   return json.data as Employee
 }
 
+export async function deleteEmployee(id: string): Promise<void> {
+  const res = await fetch(`/api/employees/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+  })
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}))
+    throw new Error(json.error || 'Failed to delete employee')
+  }
+}
+
 export async function fetchPayrollSettings(): Promise<PayrollSettings> {
   const res = await fetch('/api/payroll/settings')
   if (!res.ok) throw new Error('Failed to fetch payroll settings')
