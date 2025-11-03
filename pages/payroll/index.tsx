@@ -515,6 +515,7 @@ export default function PayrollPage() {
       queryClient.invalidateQueries({ queryKey: ['payslips'] })
       queryClient.invalidateQueries({ queryKey: ['remittances'] }) // This will invalidate all remittances queries for all months
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['p9'] })
       
       // Wait for refetch to complete before showing success
       console.log('[savePayroll] Refetching queries...')
@@ -522,10 +523,8 @@ export default function PayrollPage() {
         queryClient.refetchQueries({ queryKey: ['payslips'] }),
         queryClient.refetchQueries({ queryKey: ['remittances'] }),
         queryClient.refetchQueries({ queryKey: ['dashboard-stats'] }),
+        queryClient.refetchQueries({ queryKey: ['p9'] }),
       ])
-      await queryClient.refetchQueries({ queryKey: ['dashboard-stats'], type: 'active' })
-      await queryClient.invalidateQueries({ queryKey: ['p9'] })
-      await queryClient.refetchQueries({ queryKey: ['p9'], type: 'active' })
       console.log('[savePayroll] Queries invalidated and refetched successfully')
 
       // Format period_month for display (convert '2025-09-30' to '2025-09')
