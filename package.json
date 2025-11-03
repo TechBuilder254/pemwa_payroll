@@ -2,6 +2,9 @@
   "name": "pemwa-payroll",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "concurrently -n api,web -c blue,green \"npm:dev:api\" \"vite\"",
     "predev:api": "SILENT=true tsx scripts/kill-port.ts 5174 || true",
