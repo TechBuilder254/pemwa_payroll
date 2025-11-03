@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { formatCurrency } from '@/lib/payroll-calculations'
-import Link from 'next/link'
+import { Link } from 'react-router-dom'
 import { useDashboardStats } from '@/hooks/useDashboardStats'
 
 function StatCard({ 
@@ -230,7 +230,7 @@ function QuickActions() {
                 transition={{ delay: index * 0.1, duration: 0.3 }}
               >
                 <Link
-                  href={action.href}
+                  to={action.href}
                   className="group p-4 rounded-xl border-2 border-border/50 bg-card hover:bg-card/80 transition-all duration-200 hover:shadow-lg hover:border-primary/30 min-w-0 overflow-hidden flex flex-col"
                 >
                   <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${action.gradient} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform flex-shrink-0 shadow-lg`}>

@@ -33,6 +33,9 @@
     "**/*.tsx"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "pages/_app.tsx",
+    "pages/api/**/*",
+    "pages/employees/**/*"
   ]
 }
