@@ -107,9 +107,19 @@ async function initializeDatabase() {
   }
 }
 
-initializeDatabase().catch((e) => {
-  console.error('[api] Failed to initialize database:', e)
-})
+// Initialize database connection (non-blocking for serverless)
+if (process.env.VERCEL) {
+  // On Vercel, initialize async without blocking - connection will be established on first request
+  initializeDatabase().catch((e) => {
+    console.error('[api] Failed to initialize database (non-fatal, will retry on first request):', e.message)
+  })
+} else {
+  // On local dev, fail fast if DB connection fails
+  initializeDatabase().catch((e) => {
+    console.error('[api] Failed to initialize database:', e)
+    process.exit(1)
+  })
+}
 
 // ==================== Authentication Routes ====================
 
@@ -184,9 +194,11 @@ app.post('/api/auth/register', async (req, res) => {
 // Login
 app.post('/api/auth/login', async (req, res) => {
   try {
+    console.log('[api/auth/login] Login attempt started')
     const { email, password } = req.body
 
     if (!email || !password) {
+      console.log('[api/auth/login] Missing email or password')
       res.status(400).json({ error: 'Email and password are required' })
       return
     }
@@ -241,6 +253,7 @@ app.post('/api/auth/login', async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     })
 
+    console.log('[api/auth/login] Login successful for:', email)
     res.status(200).json({
       data: {
         user: {
@@ -253,8 +266,17 @@ app.post('/api/auth/login', async (req, res) => {
       },
     })
   } catch (e: any) {
-    console.error('[api] Login error:', e)
-    res.status(500).json({ error: e?.message || 'Failed to login' })
+    console.error('[api/auth/login] Login error:', e)
+    console.error('[api/auth/login] Error stack:', e?.stack)
+    console.error('[api/auth/login] Error details:', {
+      message: e?.message,
+      name: e?.name,
+      code: e?.code,
+    })
+    res.status(500).json({ 
+      error: e?.message || 'Failed to login',
+      details: process.env.NODE_ENV === 'development' ? e?.stack : undefined
+    })
   }
 })
 

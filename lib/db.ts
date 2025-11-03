@@ -16,10 +16,12 @@ const connectionString = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL
 
 // Validate connection string
 if (!connectionString) {
+  const errorMsg = 'Database connection string is required. Set SUPABASE_DB_URL or DATABASE_URL in environment variables'
   console.error('[db] ❌ Missing database connection string!')
-  console.error('[db] Please set SUPABASE_DB_URL or DATABASE_URL in .env.local')
-  console.error('[db] Format: SUPABASE_DB_URL=postgresql://postgres:PASSWORD@db.xxxxx.supabase.co:5432/postgres')
-  throw new Error('Database connection string is required. Set SUPABASE_DB_URL or DATABASE_URL in .env.local')
+  console.error('[db] VERCEL:', process.env.VERCEL ? 'YES' : 'NO')
+  console.error('[db] Available env vars:', Object.keys(process.env).filter(k => k.includes('DATABASE') || k.includes('SUPABASE')).join(', ') || 'NONE')
+  console.error('[db] Please set SUPABASE_DB_URL or DATABASE_URL')
+  throw new Error(errorMsg)
 }
 
 // Validate connection string format and password
@@ -50,6 +52,13 @@ export const pool = new Pool({
 })
 
 export async function query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
-  const res = await pool.query<T>(text, params)
-  return res
+  try {
+    const res = await pool.query<T>(text, params)
+    return res
+  } catch (error: any) {
+    console.error('[db] Query error:', error?.message)
+    console.error('[db] Query:', text.substring(0, 100))
+    console.error('[db] Error code:', error?.code)
+    throw error
+  }
 }
