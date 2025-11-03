@@ -1,6 +1,5 @@
 import express from 'express'
 import cors from 'cors'
-import bodyParser from 'body-parser'
 import cookieParser from 'cookie-parser'
 import session from 'express-session'
 import { createServer } from 'http'
@@ -62,7 +61,9 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }))
-app.use(bodyParser.json({ limit: '1mb' }))
+// Use express.json instead of body-parser for better compatibility
+app.use(express.json({ limit: '1mb' }))
+app.use(express.urlencoded({ extended: true, limit: '1mb' }))
 app.use(cookieParser())
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-session-secret-change-in-production',

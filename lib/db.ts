@@ -39,11 +39,14 @@ try {
 
 export const pool = new Pool({
   connectionString,
-  max: 10,
+  // For serverless (Vercel), reduce max connections to avoid connection exhaustion
+  max: process.env.VERCEL ? 2 : 10,
   ssl: connectionString?.includes('supabase') ? { rejectUnauthorized: false } : undefined,
   connectionTimeoutMillis: 10000, // 10 second timeout
   idleTimeoutMillis: 30000,
   allowExitOnIdle: true,
+  // For serverless, close idle connections faster
+  ...(process.env.VERCEL ? { idleTimeoutMillis: 10000 } : {}),
 })
 
 export async function query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
