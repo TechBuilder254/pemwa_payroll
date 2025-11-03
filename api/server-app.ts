@@ -4,8 +4,8 @@ import cookieParser from 'cookie-parser'
 import session from 'express-session'
 import { createServer } from 'http'
 // Use relative imports that work from api/ directory
-import { query } from '../lib/db.js'
-import { hashPassword, comparePassword, generateToken, authenticate, type AuthRequest } from '../lib/auth.js'
+import { query } from '../lib/db.js.js'
+import { hashPassword, comparePassword, generateToken, authenticate, type AuthRequest } from '../lib/auth.js.js'
 
 const app = express()
 const DEFAULT_PORT = Number(process.env.API_PORT || 5174)
