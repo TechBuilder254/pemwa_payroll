@@ -45,16 +45,39 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
   process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
   process.env.VITE_VERCEL_URL ? `https://${process.env.VITE_VERCEL_URL}` : undefined,
+  // Allow Vercel deployment URLs (both custom domain and *.vercel.app)
+  process.env.VERCEL ? 'https://pemwa-payroll.vercel.app' : undefined,
+  process.env.VERCEL ? `https://${process.env.VERCEL_URL}` : undefined,
   'http://localhost:5173',
   'http://localhost:3000',
 ].filter(Boolean) as string[]
 
 app.use(cors({
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Log origin for debugging
+    if (origin) {
+      console.log('[api] CORS check - Origin:', origin)
+      console.log('[api] CORS check - Allowed origins:', allowedOrigins)
+    }
+    
+    // On Vercel, be more permissive - allow all vercel.app domains
+    if (process.env.VERCEL) {
+      if (!origin || 
+          allowedOrigins.includes(origin) || 
+          origin.includes('.vercel.app') ||
+          origin.includes('vercel.app')) {
+        console.log('[api] CORS: Allowing origin (Vercel):', origin || 'no origin')
+        callback(null, true)
+        return
+      }
+    }
+    
     // Allow requests with no origin (mobile apps, Postman, etc.) or from allowed origins
     if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+      console.log('[api] CORS: Allowing origin:', origin || 'no origin')
       callback(null, true)
     } else {
+      console.log('[api] CORS: Rejecting origin:', origin)
       callback(new Error('Not allowed by CORS'))
     }
   },
@@ -109,17 +132,17 @@ async function initializeDatabase() {
 }
 
 // Initialize database connection (non-blocking for serverless)
-if (process.env.VERCEL) {
-  // On Vercel, initialize async without blocking - connection will be established on first request
-  initializeDatabase().catch((e) => {
-    console.error('[api] Failed to initialize database (non-fatal, will retry on first request):', e.message)
-  })
-} else {
+// On Vercel, don't initialize on startup - let it connect on first request
+// This avoids connection timeouts during cold starts
+if (!process.env.VERCEL) {
   // On local dev, fail fast if DB connection fails
   initializeDatabase().catch((e) => {
     console.error('[api] Failed to initialize database:', e)
     process.exit(1)
   })
+} else {
+  // On Vercel, log that we'll connect on first request
+  console.log('[api] Vercel detected - database will connect on first request')
 }
 
 // ==================== Authentication Routes ====================
