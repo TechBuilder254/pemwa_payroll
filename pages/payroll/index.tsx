@@ -510,13 +510,19 @@ export default function PayrollPage() {
         throw new Error('Invalid response format from server: missing records_inserted field.')
       }
 
-      // Invalidate and refetch queries to refresh payslips, remittances, dashboard, etc.
-      console.log('[savePayroll] Invalidating and refetching queries...')
-      await queryClient.invalidateQueries({ queryKey: ['payslips'] })
-      await queryClient.refetchQueries({ queryKey: ['payslips'], type: 'active' })
-      await queryClient.invalidateQueries({ queryKey: ['remittances'] }) // This will invalidate all remittances queries for all months
-      await queryClient.refetchQueries({ queryKey: ['remittances'], type: 'active' })
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      // Invalidate queries first
+      console.log('[savePayroll] Invalidating queries...')
+      queryClient.invalidateQueries({ queryKey: ['payslips'] })
+      queryClient.invalidateQueries({ queryKey: ['remittances'] }) // This will invalidate all remittances queries for all months
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      
+      // Wait for refetch to complete before showing success
+      console.log('[savePayroll] Refetching queries...')
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['payslips'] }),
+        queryClient.refetchQueries({ queryKey: ['remittances'] }),
+        queryClient.refetchQueries({ queryKey: ['dashboard-stats'] }),
+      ])
       await queryClient.refetchQueries({ queryKey: ['dashboard-stats'], type: 'active' })
       await queryClient.invalidateQueries({ queryKey: ['p9'] })
       await queryClient.refetchQueries({ queryKey: ['p9'], type: 'active' })

@@ -59,7 +59,7 @@ function EmployeeForm() {
     if (!validateForm()) return
     setIsSaving(true)
     try {
-      await createEmployee({
+      const newEmployee = await createEmployee({
         name: formData.name,
         kra_pin: formData.kra_pin,
         position: formData.position,
@@ -70,14 +70,21 @@ function EmployeeForm() {
         // optional fields can be saved in dedicated tables/JSON if schema supports
       } as any)
       
-      // Invalidate and refetch employees query immediately
-      await queryClient.invalidateQueries({ queryKey: ['employees'] })
-      await queryClient.refetchQueries({ queryKey: ['employees'], type: 'active' })
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-      await queryClient.refetchQueries({ queryKey: ['dashboard-stats'], type: 'active' })
+      // Invalidate queries first
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['next-employee-id'] })
+      
+      // Wait for refetch to complete before navigating
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['employees'] }),
+        queryClient.refetchQueries({ queryKey: ['dashboard-stats'] }),
+      ])
       
       toast({ title: 'Success!', description: 'Employee has been saved successfully.', className: 'bg-green-600 text-white border-green-700' })
-      setTimeout(() => navigate('/employees'), 500)
+      
+      // Navigate immediately after refetch completes - list will be updated
+      navigate('/employees')
     } catch (error: any) {
       toast({ title: 'Error', description: error?.message || 'Failed to save employee. Please try again.', variant: 'destructive' })
     } finally {
