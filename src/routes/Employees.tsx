@@ -310,42 +310,68 @@ const Employees: React.FC = () => {
     if (!employeeToDelete) return
     
     setIsDeleting(true)
-    const employeeIdToDelete = employeeToDelete.id
+    const employeeIdToDelete = String(employeeToDelete.id) // Ensure string comparison
     const employeeName = employeeToDelete.name
     
     // Optimistically remove from cache immediately for instant UI update
     queryClient.setQueryData<Employee[]>(['employees'], (oldData) => {
       if (!oldData) return oldData
-      return oldData.filter(emp => emp.id !== employeeIdToDelete)
+      const filtered = oldData.filter(emp => String(emp.id) !== employeeIdToDelete)
+      console.log('[delete] Optimistic update - removed employee:', employeeIdToDelete, 'from', oldData.length, 'to', filtered.length)
+      return filtered
     })
     
     // Close dialog immediately for better UX
     setDeleteDialogOpen(false)
+    const employeeToDeleteBackup = employeeToDelete
     setEmployeeToDelete(null)
     
     try {
       // Perform the actual deletion
       await deleteEmployee(employeeIdToDelete)
       
-      // Force a fresh refetch from server to ensure consistency
-      await Promise.all([
-        queryClient.refetchQueries({ 
-          queryKey: ['employees'],
-          type: 'active',
-        }),
-        queryClient.refetchQueries({ 
-          queryKey: ['dashboard-stats'],
-          type: 'active',
-        }),
-      ])
+      // Invalidate queries to mark them as stale, but don't refetch immediately
+      // This allows the optimistic update to stay visible while server processes
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       
+      // Show success toast
       toast({ 
         title: 'Employee deleted', 
         description: `${employeeName} has been removed successfully.`,
         className: 'bg-green-600 text-white border-green-700'
       })
+      
+      // Refetch after a delay to sync with server (but optimistic update stays visible)
+      // Only refetch if component is still mounted and query is active
+      setTimeout(() => {
+        queryClient.refetchQueries({ 
+          queryKey: ['employees'],
+          type: 'active',
+        }).catch(() => {
+          // Silently fail if component unmounted or query inactive
+        })
+        queryClient.refetchQueries({ 
+          queryKey: ['dashboard-stats'],
+          type: 'active',
+        }).catch(() => {
+          // Silently fail if component unmounted or query inactive
+        })
+      }, 1000)
+      
     } catch (err: any) {
-      // Rollback on error - invalidate and refetch to restore correct state
+      // Rollback on error - restore the employee to the list
+      queryClient.setQueryData<Employee[]>(['employees'], (oldData) => {
+        if (!oldData) return oldData
+        // Check if employee is already in the list
+        const exists = oldData.some(emp => String(emp.id) === employeeIdToDelete)
+        if (!exists && employeeToDeleteBackup) {
+          return [...oldData, employeeToDeleteBackup]
+        }
+        return oldData
+      })
+      
+      // Invalidate to force refetch of correct data
       queryClient.invalidateQueries({ queryKey: ['employees'] })
       await queryClient.refetchQueries({ queryKey: ['employees'] })
       
