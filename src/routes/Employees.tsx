@@ -330,21 +330,21 @@ const Employees: React.FC = () => {
       // Perform the actual deletion
       await deleteEmployee(employeeIdToDelete)
       
-      // Invalidate queries to mark them as stale, but don't refetch immediately
-      // This allows the optimistic update to stay visible while server processes
-      queryClient.invalidateQueries({ queryKey: ['employees'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-      
-      // Show success toast
+      // Show success toast immediately
       toast({ 
         title: 'Employee deleted', 
         description: `${employeeName} has been removed successfully.`,
         className: 'bg-green-600 text-white border-green-700'
       })
       
-      // Refetch after a delay to sync with server (but optimistic update stays visible)
-      // Only refetch if component is still mounted and query is active
+      // Don't invalidate immediately - keep the optimistic update visible
+      // Only refetch after a delay to sync with server, ensuring server has processed deletion
       setTimeout(() => {
+        // Update cache with fresh data from server
+        queryClient.invalidateQueries({ queryKey: ['employees'] })
+        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+        
+        // Refetch to sync with server
         queryClient.refetchQueries({ 
           queryKey: ['employees'],
           type: 'active',
@@ -357,7 +357,7 @@ const Employees: React.FC = () => {
         }).catch(() => {
           // Silently fail if component unmounted or query inactive
         })
-      }, 1000)
+      }, 1500)
       
     } catch (err: any) {
       // Rollback on error - restore the employee to the list
