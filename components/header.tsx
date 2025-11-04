@@ -15,7 +15,8 @@ import {
   Calculator, 
   FileText, 
   Building2, 
-  Settings 
+  Settings,
+  Shield
 } from "lucide-react"
 
 const pageConfig: Record<string, { title: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -27,6 +28,7 @@ const pageConfig: Record<string, { title: string; icon: React.ComponentType<{ cl
   "/remittances": { title: "Remittances", icon: Building2 },
   "/p9": { title: "P9 Forms", icon: FileText },
   "/settings": { title: "Settings", icon: Settings },
+  "/system-control": { title: "System Control", icon: Shield },
 }
 
 export function Header() {

@@ -614,3 +614,84 @@ export async function getCurrentUser(): Promise<User> {
   return json.data as User
 }
 
+// User Management Functions
+export interface SystemUser {
+  id: string
+  email: string
+  name: string
+  role: string
+  is_active: boolean
+  last_login?: string
+  created_at: string
+  updated_at: string
+}
+
+export async function fetchUsers(): Promise<SystemUser[]> {
+  const res = await apiFetch('/api/users')
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: 'Failed to fetch users' }))
+    throw new Error(error.error || 'Failed to fetch users')
+  }
+  const json = await res.json()
+  return json.data as SystemUser[]
+}
+
+export async function createUser(payload: { email: string; password: string; name: string; role?: string }): Promise<SystemUser> {
+  const res = await apiFetch('/api/users', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: 'Failed to create user' }))
+    throw new Error(error.error || 'Failed to create user')
+  }
+  const json = await res.json()
+  return json.data as SystemUser
+}
+
+export async function updateUser(id: string, payload: Partial<SystemUser>): Promise<SystemUser> {
+  const res = await apiFetch(`/api/users/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: 'Failed to update user' }))
+    throw new Error(error.error || 'Failed to update user')
+  }
+  const json = await res.json()
+  return json.data as SystemUser
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  const res = await apiFetch(`/api/users/${id}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: 'Failed to delete user' }))
+    throw new Error(error.error || 'Failed to delete user')
+  }
+}
+
+export async function toggleUserActive(id: string): Promise<SystemUser> {
+  const res = await apiFetch(`/api/users/${id}/toggle-active`, {
+    method: 'PATCH',
+  })
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: 'Failed to toggle user status' }))
+    throw new Error(error.error || 'Failed to toggle user status')
+  }
+  const json = await res.json()
+  return json.data as SystemUser
+}
+
+export async function updateUserPassword(id: string, password: string): Promise<void> {
+  const res = await apiFetch(`/api/users/${id}/password`, {
+    method: 'PUT',
+    body: JSON.stringify({ password }),
+  })
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: 'Failed to update password' }))
+    throw new Error(error.error || 'Failed to update password')
+  }
+}
+

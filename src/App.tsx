@@ -15,6 +15,7 @@ import Remittances from '@/src/routes/Remittances'
 import P9 from '@/src/routes/P9'
 import Login from '@/src/routes/Login'
 import EmployeeDetails from '@/src/routes/EmployeeDetails'
+import SystemControl from '@/pages/system-control'
 import { ScrollToTop } from '@/src/components/ScrollToTop'
 import { InactivityTimeout } from '@/components/InactivityTimeout'
 import { startDbKeepAlive, stopDbKeepAlive } from '@/lib/db-keepalive'
@@ -109,6 +110,7 @@ const App: React.FC = () => {
             <Route path="/payslips" element={<ProtectedRoute><Payslips /></ProtectedRoute>} />
             <Route path="/remittances" element={<ProtectedRoute><Remittances /></ProtectedRoute>} />
             <Route path="/p9" element={<ProtectedRoute><P9 /></ProtectedRoute>} />
+            <Route path="/system-control" element={<ProtectedRoute><SystemControl /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />
           </Routes>
         </main>

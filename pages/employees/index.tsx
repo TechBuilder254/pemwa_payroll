@@ -17,13 +17,15 @@ import {
   Edit,
   Eye,
   Users,
-  Building2
+  Building2,
+  Trash2
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { formatCurrency } from '@/lib/payroll-calculations'
 import { useEmployees } from '@/hooks/useEmployees'
 import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/use-toast'
+import { PasswordConfirmDialog } from '@/components/password-confirm-dialog'
 
 // Data now comes from API hooks; this file no longer holds mock data
 
@@ -120,6 +122,15 @@ function EmployeeCard({ employee, onView, onEdit, onDelete }: {
               <Edit className="h-4 w-4 mr-1" />
               Edit
             </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10" 
+              onClick={() => onDelete(employee)}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
+            </Button>
           </div>
         </div>
       </CardContent>
@@ -171,6 +182,8 @@ export default function Employees() {
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const { data: employees, isLoading: isEmployeesLoading, refetch: refetchEmployees } = useEmployees()
+  const [employeeToDelete, setEmployeeToDelete] = useState<any | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   
   // Refetch employees when this page is visited or when route changes
   // This ensures we always have the latest data when navigating to this page
@@ -260,19 +273,11 @@ export default function Employees() {
                 employee={employee}
                 onView={(e) => router.push(`/employees/${e.id}`)}
                 onEdit={(e) => router.push(`/employees/${e.id}`)}
-                onDelete={async (e) => {
-                  if (!confirm(`Delete ${e.name} (${e.employee_id})? This cannot be undone.`)) return
-                  try {
-                    const res = await fetch(`/api/employees/${e.id}`, { method: 'DELETE' })
-                    if (!res.ok) throw new Error((await res.json()).error || 'Failed to delete')
-                    toast({ title: 'Employee deleted', description: `${e.name} removed.` })
-                    await queryClient.invalidateQueries({ queryKey: ['employees'] })
-                    await queryClient.refetchQueries({ queryKey: ['employees'], type: 'active' })
-                    await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-                    await queryClient.refetchQueries({ queryKey: ['dashboard-stats'], type: 'active' })
-                  } catch (err: any) {
-                    toast({ title: 'Delete failed', description: err?.message || 'Could not delete employee', variant: 'destructive' })
-                  }
+                onDelete={(e) => {
+                  console.log('Delete clicked for employee:', e)
+                  setEmployeeToDelete(e)
+                  setShowDeleteDialog(true)
+                  console.log('Dialog state set to true')
                 }}
               />
             ))
@@ -284,21 +289,64 @@ export default function Employees() {
           employees={filteredEmployees as any}
           onView={(e: any) => router.push(`/employees/${e.id}`)}
           onEdit={(e: any) => router.push(`/employees/${e.id}`)}
-          onDelete={async (e: any) => {
-              if (!confirm(`Delete ${e.name} (${e.employee_id})? This cannot be undone.`)) return
+          onDelete={(e: any) => {
+              console.log('Delete clicked for employee (desktop):', e)
+              setEmployeeToDelete(e)
+              setShowDeleteDialog(true)
+              console.log('Dialog state set to true')
+            }}
+          />
+
+        {/* Delete Confirmation Dialog with Password */}
+        {showDeleteDialog && employeeToDelete && (
+          <PasswordConfirmDialog
+            open={showDeleteDialog}
+            onOpenChange={(open) => {
+              console.log('Dialog onOpenChange called:', open)
+              setShowDeleteDialog(open)
+              if (!open) {
+                setEmployeeToDelete(null)
+              }
+            }}
+            onConfirm={async () => {
+              if (!employeeToDelete) return
               try {
-                const res = await fetch(`/api/employees/${e.id}`, { method: 'DELETE' })
+                const token = typeof window !== 'undefined' 
+                  ? localStorage.getItem('auth_token') || document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1]
+                  : null
+
+                const headers: Record<string, string> = {
+                  'Content-Type': 'application/json',
+                }
+
+                if (token) {
+                  headers['Authorization'] = `Bearer ${token}`
+                }
+
+                const res = await fetch(`/api/employees/${employeeToDelete.id}`, { 
+                  method: 'DELETE',
+                  headers,
+                  credentials: 'include'
+                })
                 if (!res.ok) throw new Error((await res.json()).error || 'Failed to delete')
-                toast({ title: 'Employee deleted', description: `${e.name} removed.` })
+                toast({ title: 'Employee deleted', description: `${employeeToDelete.name} removed.` })
                 await queryClient.invalidateQueries({ queryKey: ['employees'] })
                 await queryClient.refetchQueries({ queryKey: ['employees'], type: 'active' })
                 await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
                 await queryClient.refetchQueries({ queryKey: ['dashboard-stats'], type: 'active' })
+                setEmployeeToDelete(null)
+                setShowDeleteDialog(false)
               } catch (err: any) {
                 toast({ title: 'Delete failed', description: err?.message || 'Could not delete employee', variant: 'destructive' })
+                throw err
               }
             }}
+            title="Delete Employee"
+            description="Are you sure you want to delete this employee? This action cannot be undone."
+            warningMessage="This will permanently remove the employee and all associated payroll records from the system."
+            itemName={`${employeeToDelete.name} (${employeeToDelete.employee_id})`}
           />
+        )}
 
         {/* Empty State */}
         {filteredEmployees.length === 0 && !isEmployeesLoading && (

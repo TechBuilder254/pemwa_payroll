@@ -326,6 +326,262 @@ app.post('/api/auth/logout', (req, res) => {
   res.status(200).json({ data: { message: 'Logged out successfully' } })
 })
 
+// Verify password for confirmation dialogs
+app.post('/api/auth/verify-password', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { password } = req.body
+
+    if (!password) {
+      res.status(400).json({ error: 'Password is required' })
+      return
+    }
+
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' })
+      return
+    }
+
+    // Get user's password hash
+    const { rows } = await query(
+      `select password_hash from users where id = $1`,
+      [req.user.id]
+    )
+
+    if (rows.length === 0) {
+      res.status(404).json({ error: 'User not found' })
+      return
+    }
+
+    // Verify password
+    const isValid = await comparePassword(password, rows[0].password_hash)
+
+    if (!isValid) {
+      res.status(401).json({ error: 'Invalid password' })
+      return
+    }
+
+    res.status(200).json({ data: { message: 'Password verified' } })
+  } catch (e: any) {
+    console.error('[api] Verify password error:', e)
+    res.status(500).json({ error: e?.message || 'Failed to verify password' })
+  }
+})
+
+// ==================== User Management Endpoints ====================
+
+// Get all users
+app.get('/api/users', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { rows } = await query(
+      `select id::text, email, name, role, is_active,
+              to_char(last_login, 'YYYY-MM-DD"T"HH24:MI:SSZ') as last_login,
+              to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SSZ') as created_at,
+              to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SSZ') as updated_at
+       from users
+       order by created_at desc`
+    )
+
+    res.status(200).json({ data: rows })
+  } catch (e: any) {
+    console.error('[api] Get users error:', e)
+    res.status(500).json({ error: e?.message || 'Failed to fetch users' })
+  }
+})
+
+// Create new user
+app.post('/api/users', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { email, password, name, role = 'admin' } = req.body
+
+    if (!email || !password || !name) {
+      res.status(400).json({ error: 'Email, password, and name are required' })
+      return
+    }
+
+    // Check if user already exists
+    const existingUser = await query(
+      `select id from users where email = $1`,
+      [email.toLowerCase()]
+    )
+
+    if (existingUser.rows.length > 0) {
+      res.status(409).json({ error: 'User with this email already exists' })
+      return
+    }
+
+    // Hash password
+    const passwordHash = await hashPassword(password)
+
+    // Create user
+    const { rows } = await query(
+      `insert into users (email, password_hash, name, role, is_active)
+       values ($1, $2, $3, $4, true)
+       returning id::text, email, name, role, is_active,
+                 to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SSZ') as created_at,
+                 to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SSZ') as updated_at`,
+      [email.toLowerCase(), passwordHash, name, role]
+    )
+
+    res.status(201).json({ data: rows[0] })
+  } catch (e: any) {
+    console.error('[api] Create user error:', e)
+    res.status(500).json({ error: e?.message || 'Failed to create user' })
+  }
+})
+
+// Update user
+app.put('/api/users/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params
+    const { email, name, role, is_active } = req.body
+
+    // Build update query dynamically
+    const updates: string[] = []
+    const values: any[] = []
+    let paramCount = 1
+
+    if (email !== undefined) {
+      updates.push(`email = $${paramCount++}`)
+      values.push(email.toLowerCase())
+    }
+    if (name !== undefined) {
+      updates.push(`name = $${paramCount++}`)
+      values.push(name)
+    }
+    if (role !== undefined) {
+      updates.push(`role = $${paramCount++}`)
+      values.push(role)
+    }
+    if (is_active !== undefined) {
+      updates.push(`is_active = $${paramCount++}`)
+      values.push(is_active)
+    }
+
+    if (updates.length === 0) {
+      res.status(400).json({ error: 'No fields to update' })
+      return
+    }
+
+    values.push(id)
+
+    const { rows } = await query(
+      `update users 
+       set ${updates.join(', ')}, updated_at = now()
+       where id = $${paramCount}
+       returning id::text, email, name, role, is_active,
+                 to_char(last_login, 'YYYY-MM-DD"T"HH24:MI:SSZ') as last_login,
+                 to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SSZ') as created_at,
+                 to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SSZ') as updated_at`,
+      values
+    )
+
+    if (rows.length === 0) {
+      res.status(404).json({ error: 'User not found' })
+      return
+    }
+
+    res.status(200).json({ data: rows[0] })
+  } catch (e: any) {
+    console.error('[api] Update user error:', e)
+    res.status(500).json({ error: e?.message || 'Failed to update user' })
+  }
+})
+
+// Delete user
+app.delete('/api/users/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params
+
+    // Prevent deleting yourself
+    if (req.user && req.user.id === id) {
+      res.status(400).json({ error: 'Cannot delete your own account' })
+      return
+    }
+
+    const { rows } = await query(
+      `delete from users where id = $1 returning id::text`,
+      [id]
+    )
+
+    if (rows.length === 0) {
+      res.status(404).json({ error: 'User not found' })
+      return
+    }
+
+    res.status(200).json({ data: { message: 'User deleted successfully' } })
+  } catch (e: any) {
+    console.error('[api] Delete user error:', e)
+    res.status(500).json({ error: e?.message || 'Failed to delete user' })
+  }
+})
+
+// Toggle user active status
+app.patch('/api/users/:id/toggle-active', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params
+
+    // Prevent deactivating yourself
+    if (req.user && req.user.id === id) {
+      res.status(400).json({ error: 'Cannot deactivate your own account' })
+      return
+    }
+
+    const { rows } = await query(
+      `update users 
+       set is_active = not is_active, updated_at = now()
+       where id = $1
+       returning id::text, email, name, role, is_active,
+                 to_char(last_login, 'YYYY-MM-DD"T"HH24:MI:SSZ') as last_login,
+                 to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SSZ') as created_at,
+                 to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SSZ') as updated_at`,
+      [id]
+    )
+
+    if (rows.length === 0) {
+      res.status(404).json({ error: 'User not found' })
+      return
+    }
+
+    res.status(200).json({ data: rows[0] })
+  } catch (e: any) {
+    console.error('[api] Toggle user active error:', e)
+    res.status(500).json({ error: e?.message || 'Failed to toggle user status' })
+  }
+})
+
+// Update user password
+app.put('/api/users/:id/password', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params
+    const { password } = req.body
+
+    if (!password || password.length < 6) {
+      res.status(400).json({ error: 'Password must be at least 6 characters' })
+      return
+    }
+
+    const passwordHash = await hashPassword(password)
+
+    const { rows } = await query(
+      `update users 
+       set password_hash = $1, updated_at = now()
+       where id = $2
+       returning id::text, email, name, role, is_active`,
+      [passwordHash, id]
+    )
+
+    if (rows.length === 0) {
+      res.status(404).json({ error: 'User not found' })
+      return
+    }
+
+    res.status(200).json({ data: { message: 'Password updated successfully' } })
+  } catch (e: any) {
+    console.error('[api] Update password error:', e)
+    res.status(500).json({ error: e?.message || 'Failed to update password' })
+  }
+})
+
 // Employees - Specific routes must come before dynamic routes
 app.get('/api/employees/next-id', async (_req, res) => {
   try {
