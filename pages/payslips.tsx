@@ -62,7 +62,7 @@ type PayslipShape = {
   created_at: string
 }
 
-function PayslipCard({ payslip, onView, onExportPDF, onExportExcel }: { payslip: PayslipShape, onView: (p: PayslipShape) => void, onExportPDF: (p: PayslipShape) => void, onExportExcel: (p: PayslipShape) => void }) {
+function PayslipCard({ payslip, onView, onExportPDF, onExportExcel }: { payslip: PayslipShape, onView: (p: PayslipShape) => void, onExportPDF: (p: PayslipShape) => Promise<void>, onExportExcel: (p: PayslipShape) => void }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -139,7 +139,7 @@ function PayslipCard({ payslip, onView, onExportPDF, onExportExcel }: { payslip:
   )
 }
 
-function PayslipTable({ data, onView, onExportPDF, onExportExcel }: { data: PayslipShape[]; onView: (p: PayslipShape) => void, onExportPDF: (p: PayslipShape) => void, onExportExcel: (p: PayslipShape) => void }) {
+function PayslipTable({ data, onView, onExportPDF, onExportExcel }: { data: PayslipShape[]; onView: (p: PayslipShape) => void, onExportPDF: (p: PayslipShape) => Promise<void>, onExportExcel: (p: PayslipShape) => void }) {
   return (
     <Card className="hidden sm:block overflow-hidden min-w-0 border-2">
       <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 border-b">
@@ -520,11 +520,11 @@ export default function PayslipsPage() {
               ← Back to Payslips
             </Button>
             <div className="flex gap-2">
-          <Button variant="outline" onClick={() => {
+          <Button variant="outline" onClick={async () => {
             const d = viewingPayslip
             if (!d) return
-            generatePayslipPDF({
-              employee: { name: d.employee_name, employee_id: d.employee_id },
+            await generatePayslipPDF({
+              employee: { name: d.employee_name, employee_id: d.employee_id, kra_pin: d.kra_pin },
               month: d.month,
               gross_salary: d.gross_salary,
               basic_salary: d.basic_salary,
@@ -762,8 +762,8 @@ export default function PayslipsPage() {
                 document.documentElement.scrollTop = 0
                 document.body.scrollTop = 0
               }}
-              onExportPDF={(d) => generatePayslipPDF({
-                employee: { name: d.employee_name, employee_id: d.employee_id },
+              onExportPDF={async (d) => await generatePayslipPDF({
+                employee: { name: d.employee_name, employee_id: d.employee_id, kra_pin: d.kra_pin },
                 month: d.month,
                 gross_salary: d.gross_salary,
                 basic_salary: d.basic_salary,
@@ -814,8 +814,8 @@ export default function PayslipsPage() {
         <PayslipTable 
           data={filteredPayslips}
           onView={(p) => setViewingPayslip(p)}
-          onExportPDF={(d) => generatePayslipPDF({
-            employee: { name: d.employee_name, employee_id: d.employee_id },
+          onExportPDF={async (d) => await generatePayslipPDF({
+            employee: { name: d.employee_name, employee_id: d.employee_id, kra_pin: d.kra_pin },
             month: d.month,
             gross_salary: d.gross_salary,
             basic_salary: d.basic_salary,

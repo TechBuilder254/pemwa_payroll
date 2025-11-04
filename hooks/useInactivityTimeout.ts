@@ -34,8 +34,10 @@ export function useInactivityTimeout({
 }: UseInactivityTimeoutOptions) {
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null)
   const warningTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const warningShownRef = useRef(false)
   const STORAGE_KEY = 'last_activity_time'
+  const CHECK_INTERVAL = 30000 // Check every 30 seconds
   
   // Get last activity time from localStorage or use current time
   const getLastActivityTime = (): number => {
@@ -52,7 +54,55 @@ export function useInactivityTimeout({
   }
   
   const lastActivityRef = useRef<number>(getLastActivityTime())
-  const tabHiddenTimeRef = useRef<number | null>(null) // Track when tab was hidden
+
+  // Check if timeout has been reached based on elapsed time
+  const checkTimeout = useCallback(() => {
+    if (!enabled) return
+
+    const lastActivity = getLastActivityTime()
+    const timeSinceLastActivity = Date.now() - lastActivity
+    const totalTimeout = inactivityTimeout + warningTimeout
+
+    // If total timeout exceeded, logout immediately
+    if (timeSinceLastActivity >= totalTimeout) {
+      console.log('[InactivityTimeout] Total timeout exceeded - logging out immediately')
+      if (warningTimerRef.current) {
+        clearTimeout(warningTimerRef.current)
+        warningTimerRef.current = null
+      }
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current)
+        inactivityTimerRef.current = null
+      }
+      warningShownRef.current = false
+      onLogout()
+      return true
+    }
+
+    // If inactivity timeout exceeded but not total timeout, show warning
+    if (timeSinceLastActivity >= inactivityTimeout && !warningShownRef.current) {
+      console.log('[InactivityTimeout] Inactivity timeout exceeded - showing warning')
+      warningShownRef.current = true
+      onWarning()
+
+      // Calculate remaining warning time
+      const remainingWarningTime = totalTimeout - timeSinceLastActivity
+      if (remainingWarningTime > 0) {
+        if (warningTimerRef.current) {
+          clearTimeout(warningTimerRef.current)
+        }
+        warningTimerRef.current = setTimeout(() => {
+          onLogout()
+        }, remainingWarningTime)
+      } else {
+        // No time left, logout immediately
+        onLogout()
+      }
+      return true
+    }
+
+    return false
+  }, [enabled, inactivityTimeout, warningTimeout, onWarning, onLogout])
 
   // Reset timers when user is active
   const resetTimers = useCallback(() => {
@@ -73,16 +123,18 @@ export function useInactivityTimeout({
       warningTimerRef.current = null
     }
 
-    // Set new inactivity timer
+    // Set new inactivity timer as backup (though we primarily use interval-based checking)
     inactivityTimerRef.current = setTimeout(() => {
       // Show warning when inactivity timeout is reached
-      warningShownRef.current = true
-      onWarning()
+      if (!warningShownRef.current) {
+        warningShownRef.current = true
+        onWarning()
 
-      // Start countdown timer for automatic logout
-      warningTimerRef.current = setTimeout(() => {
-        onLogout()
-      }, warningTimeout)
+        // Start countdown timer for automatic logout
+        warningTimerRef.current = setTimeout(() => {
+          onLogout()
+        }, warningTimeout)
+      }
     }, inactivityTimeout)
   }, [enabled, inactivityTimeout, warningTimeout, onWarning, onLogout])
 
@@ -114,6 +166,10 @@ export function useInactivityTimeout({
         clearTimeout(warningTimerRef.current)
         warningTimerRef.current = null
       }
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current)
+        checkIntervalRef.current = null
+      }
       return
     }
 
@@ -122,33 +178,28 @@ export function useInactivityTimeout({
     // Re-read from localStorage to get accurate last activity time
     const lastActivity = getLastActivityTime()
     lastActivityRef.current = lastActivity
-    const timeSinceLastActivity = Date.now() - lastActivity
-    const totalTimeout = inactivityTimeout + warningTimeout
     
-    if (timeSinceLastActivity >= totalTimeout) {
-      // User has been inactive too long - logout immediately
-      console.log('[InactivityTimeout] User inactive too long on mount - logging out')
-      onLogout()
-      return
-    } else if (timeSinceLastActivity >= inactivityTimeout) {
-      // User has been inactive longer than timeout - show warning
-      console.log('[InactivityTimeout] User inactive on mount - showing warning')
-      warningShownRef.current = true
-      onWarning()
-      
-      const remainingWarningTime = totalTimeout - timeSinceLastActivity
-      if (remainingWarningTime > 0) {
-        warningTimerRef.current = setTimeout(() => {
-          onLogout()
-        }, remainingWarningTime)
-      } else {
-        onLogout()
-      }
+    // Check timeout immediately on mount
+    if (checkTimeout()) {
+      // Timeout already reached, cleanup will happen in checkTimeout
       return
     }
     
     // Initialize timer on mount
     resetTimers()
+
+    // Start continuous interval-based checking
+    // This works even when tab is hidden (though browser may throttle it)
+    // The key is we check against localStorage which persists across tabs
+    checkIntervalRef.current = setInterval(() => {
+      const timeoutReached = checkTimeout()
+      // If timeout was reached, the interval will be cleared by cleanup
+      // when enabled becomes false (after logout)
+      if (timeoutReached && checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current)
+        checkIntervalRef.current = null
+      }
+    }, CHECK_INTERVAL)
 
     // Activity events to track
     const events = [
@@ -181,59 +232,22 @@ export function useInactivityTimeout({
     })
 
     // Track visibility changes (tab focus/blur)
-    // This is critical for detecting when user switches tabs or goes to another website
+    // When tab becomes visible, immediately check timeout
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        // Tab was hidden - record the time
-        tabHiddenTimeRef.current = Date.now()
-        console.log('[InactivityTimeout] Tab hidden at:', new Date(tabHiddenTimeRef.current).toISOString())
-      } else if (document.visibilityState === 'visible') {
-        // Tab became visible again - check how long it was hidden
-        if (tabHiddenTimeRef.current !== null) {
-          const timeHidden = Date.now() - tabHiddenTimeRef.current
-          const timeSinceLastActivity = Date.now() - lastActivityRef.current
-          const totalInactiveTime = Math.max(timeHidden, timeSinceLastActivity)
-          
-          console.log('[InactivityTimeout] Tab visible again after:', Math.round(timeHidden / 1000), 'seconds')
-          console.log('[InactivityTimeout] Total inactive time:', Math.round(totalInactiveTime / 1000), 'seconds')
-          
-          // If user was away longer than inactivity timeout + warning timeout, log them out immediately
-          const totalTimeout = inactivityTimeout + warningTimeout
-          if (totalInactiveTime >= totalTimeout) {
-            console.log('[InactivityTimeout] User was away too long - logging out immediately')
-            onLogout()
-            return
-          }
-          
-          // If user was away longer than inactivity timeout, show warning immediately
-          if (totalInactiveTime >= inactivityTimeout) {
-            console.log('[InactivityTimeout] User was away longer than inactivity timeout - showing warning')
-            warningShownRef.current = true
-            onWarning()
-            
-            // Calculate remaining warning time
-            const remainingWarningTime = totalTimeout - totalInactiveTime
-            if (remainingWarningTime > 0) {
-              warningTimerRef.current = setTimeout(() => {
-                onLogout()
-              }, remainingWarningTime)
-            } else {
-              // No time left, logout immediately
-              onLogout()
-            }
-            return
-          }
-        }
-        
-        // If user wasn't away too long, reset timers normally
-        if (!warningShownRef.current) {
-          resetTimers()
-        }
-        
-        tabHiddenTimeRef.current = null
+      if (document.visibilityState === 'visible') {
+        console.log('[InactivityTimeout] Tab became visible - checking timeout immediately')
+        // Immediately check timeout when tab becomes visible
+        checkTimeout()
       }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    // Also listen for window focus events
+    const handleFocus = () => {
+      console.log('[InactivityTimeout] Window focused - checking timeout immediately')
+      checkTimeout()
+    }
+    window.addEventListener('focus', handleFocus)
 
     // Cleanup
     return () => {
@@ -241,6 +255,7 @@ export function useInactivityTimeout({
         window.removeEventListener(event, handleActivity)
       })
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
       if (throttleTimeout) {
         clearTimeout(throttleTimeout)
       }
@@ -250,8 +265,11 @@ export function useInactivityTimeout({
       if (warningTimerRef.current) {
         clearTimeout(warningTimerRef.current)
       }
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current)
+      }
     }
-  }, [enabled, resetTimers])
+  }, [enabled, resetTimers, checkTimeout])
 
   return {
     extendSession,

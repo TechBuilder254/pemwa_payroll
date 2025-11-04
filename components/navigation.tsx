@@ -118,52 +118,56 @@ export function Navigation() {
                     {navigation.map((item) => {
                       const Icon = item.icon
                       const isActive = pathname === item.href
+                      const isSettings = item.name === "Settings"
                       
                       return (
-                        <Link
-                          key={item.name}
-                          to={item.href}
-                          onClick={() => setIsOpen(false)}
-                          className={cn(
-                            "flex items-center space-x-2 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-300 border flex-shrink-0",
-                            isActive
-                              ? "bg-gradient-to-r from-primary via-primary to-primary/90 text-primary-foreground shadow-lg border-primary/50"
-                              : "text-slate-700 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-foreground hover:bg-card/80 border-transparent hover:border-border/50"
+                        <React.Fragment key={item.name}>
+                          <Link
+                            to={item.href}
+                            onClick={() => setIsOpen(false)}
+                            className={cn(
+                              "flex items-center space-x-3 px-3 py-2.5 rounded-lg text-base font-semibold transition-all duration-300 border flex-shrink-0 tracking-wide",
+                              isActive
+                                ? "bg-gradient-to-r from-primary via-primary to-primary/90 text-primary-foreground shadow-lg border-primary/50"
+                                : "text-slate-700 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-foreground hover:bg-card/80 border-transparent hover:border-border/50"
+                            )}
+                          >
+                            <Icon className="h-5 w-5 flex-shrink-0" />
+                            <span className="truncate">{item.name}</span>
+                          </Link>
+                          {/* Add space after Settings for Theme and Logout */}
+                          {isSettings && (
+                            <>
+                              <div className="mt-2 mb-1" />
+                              {/* Theme Toggle */}
+                              <div className="flex items-center justify-between px-3 py-2.5 rounded-lg border border-border/50 bg-card/50">
+                                <span className="text-base font-semibold text-slate-700 dark:text-muted-foreground tracking-wide">Theme</span>
+                                <ThemeToggle />
+                              </div>
+                              
+                              {/* Logout Button */}
+                              <Button
+                                variant="ghost"
+                                onClick={async () => {
+                                  setIsLoggingOut(true)
+                                  try {
+                                    await logout()
+                                    setIsOpen(false)
+                                  } finally {
+                                    setIsLoggingOut(false)
+                                  }
+                                }}
+                                disabled={isLoggingOut}
+                                className="w-full justify-start text-base font-semibold text-muted-foreground hover:text-destructive hover:bg-destructive/10 px-3 py-2.5 h-auto min-h-[40px] tracking-wide"
+                              >
+                                <LogOut className="h-5 w-5 mr-3 flex-shrink-0" />
+                                <span>{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+                              </Button>
+                            </>
                           )}
-                        >
-                          <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-                          <span className="truncate">{item.name}</span>
-                        </Link>
+                        </React.Fragment>
                       )
                     })}
-                  </div>
-                  
-                  {/* Theme Toggle and Logout - Fixed at bottom, always visible, compact */}
-                  <div className="px-2 py-1.5 border-t border-border/50 space-y-1 flex-shrink-0 bg-background">
-                    {/* Theme Toggle */}
-                    <div className="flex items-center justify-between px-2.5 py-1 rounded-lg border border-border/50 bg-card/50">
-                      <span className="text-xs font-medium text-slate-700 dark:text-muted-foreground">Theme</span>
-                      <ThemeToggle />
-                    </div>
-                    
-                    {/* Logout Button */}
-                    <Button
-                      variant="ghost"
-                      onClick={async () => {
-                        setIsLoggingOut(true)
-                        try {
-                          await logout()
-                          setIsOpen(false)
-                        } finally {
-                          setIsLoggingOut(false)
-                        }
-                      }}
-                      disabled={isLoggingOut}
-                      className="w-full justify-start text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 px-2.5 py-1 h-auto min-h-[32px]"
-                    >
-                      <LogOut className="h-3.5 w-3.5 mr-2 flex-shrink-0" />
-                      <span>{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
-                    </Button>
                   </div>
                 </div>
               </motion.div>
@@ -261,27 +265,6 @@ export function Navigation() {
             </AnimatePresence>
           </div>
           
-          {/* Theme Toggle - Always visible at top */}
-          <div className={cn(
-            "border-b border-border/50 flex-shrink-0",
-            shouldExpand ? "px-3 py-3" : "px-2 py-2"
-          )}>
-            <motion.div
-              initial={prefersReducedMotion ? false : { opacity: 0, y: -10 }}
-              animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
-              transition={prefersReducedMotion ? { duration: 0 } : { delay: 0.25 }}
-              className={cn(
-                "flex items-center justify-between rounded-lg border border-border/50 bg-card/50",
-                shouldExpand ? "px-3 py-2" : "px-2 py-2 justify-center"
-              )}
-            >
-              {shouldExpand && (
-                <span className="text-xs font-medium text-slate-700 dark:text-muted-foreground">Theme</span>
-              )}
-              <ThemeToggle />
-            </motion.div>
-          </div>
-
           {/* Navigation Items */}
           <div className={cn(
             "flex-1 overflow-y-auto overflow-x-hidden",
@@ -299,70 +282,71 @@ export function Navigation() {
             {navigation.map((item, index) => {
               const Icon = item.icon
               const isActive = pathname === item.href
+              const isSettings = item.name === "Settings"
               
               return (
-                <motion.div
-                  key={item.name}
-                  layout
-                  initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
-                  animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
-                  transition={prefersReducedMotion ? { duration: 0 } : { 
-                    delay: index * 0.05,
-                    type: "spring",
-                    damping: 25,
-                    stiffness: 200,
-                    layout: { type: "spring", damping: 30, stiffness: 300 }
-                  }}
-                >
-                  <Link
-                    to={item.href}
-                    className={cn(
-                      "flex items-center rounded-lg text-sm font-medium transition-all duration-300 group relative overflow-hidden min-w-0",
-                      "hover:bg-accent/50",
-                      shouldExpand ? "px-3 py-2.5" : "px-3 py-3 justify-center",
-                      isActive
-                        ? "bg-primary/10 text-primary font-semibold"
-                        : "text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-foreground"
-                    )}
-                    title={!shouldExpand ? item.name : undefined}
+                <React.Fragment key={item.name}>
+                  <motion.div
+                    layout
+                    initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
+                    animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+                    transition={prefersReducedMotion ? { duration: 0 } : { 
+                      delay: index * 0.05,
+                      type: "spring",
+                      damping: 25,
+                      stiffness: 200,
+                      layout: { type: "spring", damping: 30, stiffness: 300 }
+                    }}
                   >
-                    {/* Left border indicator for active state */}
-                    {isActive && (
-                      <motion.div
-                        className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full"
-                        layoutId="activeIndicator"
-                        transition={{
-                          type: "spring",
-                          stiffness: 500,
-                          damping: 30
-                        }}
-                      />
-                    )}
-                    
-                    <motion.div
+                    <Link
+                      to={item.href}
                       className={cn(
-                        "rounded-lg transition-colors flex items-center justify-center",
-                        shouldExpand ? "p-1.5" : "p-2",
-                        isActive 
-                          ? "kenya-gradient" 
-                          : "group-hover:bg-accent/50"
+                        "flex items-center rounded-lg text-base font-semibold transition-all duration-300 group relative overflow-hidden min-w-0 tracking-wide",
+                        "hover:bg-accent/50",
+                        shouldExpand ? "px-3 py-3" : "px-3 py-3 justify-center",
+                        isActive
+                          ? "bg-primary/10 text-primary font-bold"
+                          : "text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-foreground"
                       )}
-                      whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
-                      whileTap={prefersReducedMotion ? undefined : { scale: 0.95 }}
+                      title={!shouldExpand ? item.name : undefined}
                     >
-                      <Icon className={cn(
-                        "flex-shrink-0 transition-colors",
-                        shouldExpand ? "h-4 w-4" : "h-5 w-5",
-                        isActive 
-                          ? "text-white" 
-                          : "text-slate-600 dark:text-muted-foreground group-hover:text-slate-900 dark:group-hover:text-foreground"
-                      )} />
-                    </motion.div>
-                    
-                    <AnimatePresence mode="wait">
-                      {shouldExpand && (
+                      {/* Left border indicator for active state */}
+                      {isActive && (
+                        <motion.div
+                          className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full"
+                          layoutId="activeIndicator"
+                          transition={{
+                            type: "spring",
+                            stiffness: 500,
+                            damping: 30
+                          }}
+                        />
+                      )}
+                      
+                      <motion.div
+                        className={cn(
+                          "rounded-lg transition-colors flex items-center justify-center",
+                          shouldExpand ? "p-1.5" : "p-2",
+                          isActive 
+                            ? "kenya-gradient" 
+                            : "group-hover:bg-accent/50"
+                        )}
+                        whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
+                        whileTap={prefersReducedMotion ? undefined : { scale: 0.95 }}
+                      >
+                        <Icon className={cn(
+                          "flex-shrink-0 transition-colors",
+                          shouldExpand ? "h-5 w-5" : "h-5 w-5",
+                          isActive 
+                            ? "text-white" 
+                            : "text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-foreground"
+                        )} />
+                      </motion.div>
+                      
+                      <AnimatePresence mode="wait">
+                        {shouldExpand && (
                         <motion.span 
-                          className="ml-3 font-semibold whitespace-nowrap flex-1 overflow-hidden"
+                          className="ml-3 font-semibold whitespace-nowrap flex-1 overflow-hidden text-base tracking-wide"
                           initial={prefersReducedMotion ? false : { opacity: 0, width: 0 }}
                           animate={prefersReducedMotion ? {} : { opacity: 1, width: 'auto' }}
                           exit={prefersReducedMotion ? {} : { opacity: 0, width: 0 }}
@@ -375,61 +359,88 @@ export function Navigation() {
                         >
                           {item.name}
                         </motion.span>
+                        )}
+                      </AnimatePresence>
+                      
+                      {/* Enhanced Tooltip for collapsed state */}
+                      {!shouldExpand && (
+                        <motion.div 
+                          className="absolute left-full ml-3 px-3 py-2 bg-popover border border-border text-popover-foreground text-sm rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50 whitespace-nowrap"
+                        >
+                          {item.name}
+                          <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1 w-2 h-2 bg-popover border-l border-b border-border rotate-45" />
+                        </motion.div>
                       )}
-                    </AnimatePresence>
-                    
-                    {/* Enhanced Tooltip for collapsed state */}
-                    {!shouldExpand && (
-                      <motion.div 
-                        className="absolute left-full ml-3 px-3 py-2 bg-popover border border-border text-popover-foreground text-sm rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50 whitespace-nowrap"
+                    </Link>
+                  </motion.div>
+                  
+                  {/* Add space and Theme/Logout after Settings */}
+                  {isSettings && (
+                    <>
+                      <div className={cn("mt-3", shouldExpand ? "mb-2" : "mb-1")} />
+                      {/* Theme Toggle */}
+                      <motion.div
+                        initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
+                        animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+                        transition={prefersReducedMotion ? { duration: 0 } : { 
+                          delay: (index + 1) * 0.05,
+                          type: "spring",
+                          damping: 25,
+                          stiffness: 200
+                        }}
+                        className={cn(
+                          "flex items-center justify-between rounded-lg border border-border/50 bg-card/50",
+                          shouldExpand ? "px-3 py-2" : "px-2 py-2 justify-center"
+                        )}
                       >
-                        {item.name}
-                        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1 w-2 h-2 bg-popover border-l border-b border-border rotate-45" />
+                        {shouldExpand && (
+                          <span className="text-base font-semibold text-slate-700 dark:text-muted-foreground tracking-wide">Theme</span>
+                        )}
+                        <ThemeToggle />
                       </motion.div>
-                    )}
-                  </Link>
-                </motion.div>
+                      
+                      {/* Logout Button */}
+                      <motion.div
+                        initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
+                        animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
+                        transition={prefersReducedMotion ? { duration: 0 } : { 
+                          delay: (index + 2) * 0.05,
+                          type: "spring",
+                          damping: 25,
+                          stiffness: 200
+                        }}
+                      >
+                        <Button
+                          variant="ghost"
+                          onClick={async () => {
+                            setIsLoggingOut(true)
+                            try {
+                              await logout()
+                            } finally {
+                              setIsLoggingOut(false)
+                            }
+                          }}
+                          disabled={isLoggingOut}
+                          className={cn(
+                            "w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 text-base font-semibold tracking-wide",
+                            shouldExpand ? "justify-start px-3 py-2.5" : "justify-center px-3 py-3"
+                          )}
+                          title={!shouldExpand ? "Logout" : undefined}
+                        >
+                          <LogOut className={cn(
+                            "flex-shrink-0",
+                            shouldExpand ? "h-5 w-5 mr-3" : "h-5 w-5"
+                          )} />
+                          {shouldExpand && (
+                            <span>{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+                          )}
+                        </Button>
+                      </motion.div>
+                    </>
+                  )}
+                </React.Fragment>
               )
             })}
-          </div>
-          
-          {/* Footer - Logout */}
-          <div className={cn(
-            "border-t border-border/50",
-            shouldExpand ? "px-3 py-4" : "px-2 py-3"
-          )}>
-            {/* Logout Button */}
-            <motion.div
-              initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
-              animate={prefersReducedMotion ? {} : { opacity: 1, y: 0 }}
-              transition={prefersReducedMotion ? { duration: 0 } : { delay: 0.35 }}
-            >
-              <Button
-                variant="ghost"
-                onClick={async () => {
-                  setIsLoggingOut(true)
-                  try {
-                    await logout()
-                  } finally {
-                    setIsLoggingOut(false)
-                  }
-                }}
-                disabled={isLoggingOut}
-                className={cn(
-                  "w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10",
-                  shouldExpand ? "justify-start px-3 py-2.5" : "justify-center px-3 py-3"
-                )}
-                title={!shouldExpand ? "Logout" : undefined}
-              >
-                <LogOut className={cn(
-                  "flex-shrink-0",
-                  shouldExpand ? "h-4 w-4 mr-3" : "h-5 w-5"
-                )} />
-                {shouldExpand && (
-                  <span>{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
-                )}
-              </Button>
-            </motion.div>
           </div>
         </div>
       </motion.nav>

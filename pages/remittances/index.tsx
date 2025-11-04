@@ -612,7 +612,7 @@ export default function RemittancesPage() {
       })),
       totals,
     }
-    generateRemittancePDF(data)
+    await generateRemittancePDF(data)
     setIsExporting(false)
   }
 

@@ -144,8 +144,8 @@ function P9Card({ p9Form, onView }: { p9Form: P9Shape, onView: (p: P9Shape) => v
               size="sm" 
               variant="outline"
               className="flex-1 hover:bg-primary/5 hover:border-primary/50"
-              onClick={() => {
-                generateP9PDF({
+              onClick={async () => {
+                await generateP9PDF({
                   employee: { name: p9Form.employee_name, employee_id: p9Form.employee_id, kra_pin: p9Form.kra_pin },
                   year: p9Form.year,
                   gross_salary_total: p9Form.gross_salary_total,
@@ -281,9 +281,9 @@ function P9Table({ data, onView }: { data: P9Shape[]; onView: (p: P9Shape) => vo
                       <Button 
                         size="sm" 
                         variant="outline"
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation()
-                          generateP9PDF({
+                          await generateP9PDF({
                             employee: { name: p9Form.employee_name, employee_id: p9Form.employee_id, kra_pin: p9Form.kra_pin },
                             year: p9Form.year,
                             gross_salary_total: p9Form.gross_salary_total,
@@ -746,10 +746,10 @@ export default function P9Page() {
             <div className="flex gap-3">
               <Button 
                 variant="outline" 
-                onClick={() => {
+                onClick={async () => {
                   const d = viewingP9
                   if (!d) return
-                  generateP9PDF({
+                  await generateP9PDF({
                     employee: { name: d.employee_name, employee_id: d.employee_id, kra_pin: d.kra_pin },
                     year: d.year,
                     gross_salary_total: d.gross_salary_total,
