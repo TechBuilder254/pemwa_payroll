@@ -6,6 +6,7 @@ import { Menu, X, Users, Calculator, FileText, BarChart3, Settings, ChevronLeft,
 import { Link, useLocation } from "react-router-dom"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { useSidebar } from "@/contexts/sidebar-context"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -94,29 +95,29 @@ export function Navigation() {
               >
                 <div className="flex flex-col h-full">
                   {/* Header */}
-                  <div className="flex items-center justify-between px-4 py-4 border-b border-border/50 pt-14 bg-gradient-to-r from-primary/5 to-primary/10">
-                    <div className="flex items-center space-x-3">
-                      <div className="kenya-gradient w-10 h-10 rounded-xl flex items-center justify-center shadow-lg">
-                        <span className="text-white font-bold text-base">P</span>
+                  <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/50 bg-gradient-to-r from-primary/5 to-primary/10 flex-shrink-0">
+                    <div className="flex items-center space-x-2">
+                      <div className="kenya-gradient w-9 h-9 rounded-xl flex items-center justify-center shadow-lg">
+                        <span className="text-white font-bold text-sm">P</span>
                       </div>
                       <div>
-                        <span className="font-bold text-base text-slate-900 dark:text-foreground">Pemwa Payroll</span>
-                        <p className="text-[10px] text-slate-600 dark:text-muted-foreground">Kenyan Payroll</p>
+                        <span className="font-bold text-sm text-slate-900 dark:text-foreground">Pemwa Payroll</span>
+                        <p className="text-[9px] text-slate-600 dark:text-muted-foreground">Kenyan Payroll</p>
                       </div>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => setIsOpen(false)}
-                      className="h-9 w-9"
+                      className="h-8 w-8"
                       aria-label="Close menu"
                     >
-                      <X className="h-5 w-5" />
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                   
                   {/* Navigation Items */}
-                  <div className="flex-1 px-3 py-4 space-y-2 overflow-y-auto">
+                  <div className="flex-1 px-2 py-2 space-y-1.5 overflow-y-auto min-h-0">
                     {navigation.map((item) => {
                       const Icon = item.icon
                       const isActive = pathname === item.href
@@ -127,21 +128,27 @@ export function Navigation() {
                           to={item.href}
                           onClick={() => setIsOpen(false)}
                           className={cn(
-                            "flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-300 border",
+                            "flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-300 border",
                             isActive
                               ? "bg-gradient-to-r from-primary via-primary to-primary/90 text-primary-foreground shadow-lg border-primary/50"
                               : "text-slate-700 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-foreground hover:bg-card/80 border-transparent hover:border-border/50"
                           )}
                         >
-                          <Icon className="h-5 w-5" />
-                          <span>{item.name}</span>
+                          <Icon className="h-4 w-4 flex-shrink-0" />
+                          <span className="truncate">{item.name}</span>
                         </Link>
                       )
                     })}
                   </div>
                   
                   {/* Footer */}
-                  <div className="px-3 py-3 border-t">
+                  <div className="px-2 py-2 border-t space-y-1.5 flex-shrink-0">
+                    {/* Theme Toggle */}
+                    <div className="flex items-center justify-between px-3 py-1.5 rounded-lg border border-border/50 bg-card/50">
+                      <span className="text-xs font-medium text-slate-700 dark:text-muted-foreground">Theme</span>
+                      <ThemeToggle />
+                    </div>
+                    
                     {/* Logout Button */}
                     <Button
                       variant="ghost"
@@ -154,9 +161,9 @@ export function Navigation() {
                         }
                       }}
                       disabled={isLoggingOut}
-                      className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      className="w-full justify-start text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 px-3 py-2 h-auto"
                     >
-                      <LogOut className="h-4 w-4 mr-3" />
+                      <LogOut className="h-3.5 w-3.5 mr-2 flex-shrink-0" />
                       <span>{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
                     </Button>
                   </div>

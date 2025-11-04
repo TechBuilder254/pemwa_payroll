@@ -117,12 +117,12 @@ export function Header() {
         {/* Right side - Theme Toggle and User Profile */}
         {pathname !== '/login' && (
           <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            {/* Theme Toggle - Always visible on all screen sizes */}
+            {/* Theme Toggle */}
             <div className="p-1 sm:p-1.5 rounded-lg border border-border/50 bg-card/50 hover:bg-card/80 transition-colors z-10">
               <ThemeToggle />
             </div>
             
-            {/* User Profile - Show on all screen sizes */}
+            {/* User Profile */}
             {user && (
               <Popover open={profileOpen} onOpenChange={setProfileOpen}>
                 <PopoverTrigger asChild>
@@ -136,7 +136,6 @@ export function Header() {
                         {getInitials(user.name)}
                       </span>
                     </div>
-                    {/* Show name on larger mobile screens (375px+), name + email on desktop */}
                     <div className="text-left min-w-0 hidden min-[375px]:block">
                       <p className="text-xs sm:text-sm font-medium text-foreground truncate max-w-[90px] sm:max-w-[120px]">
                         {user.name}
@@ -145,7 +144,6 @@ export function Header() {
                         {user.email}
                       </p>
                     </div>
-                    <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0 hidden sm:block" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent 
