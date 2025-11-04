@@ -17,7 +17,8 @@ import {
   Calculator,
   ChevronDown,
   ChevronUp,
-  Trash2
+  Trash2,
+  AlertTriangle
 } from 'lucide-react'
 import { formatCurrency, calculatePayroll } from '@/lib/payroll-calculations'
 import { useEmployees } from '@/hooks/useEmployees'
@@ -25,7 +26,18 @@ import { usePayrollSettings } from '@/hooks/usePayrollSettings'
 import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/use-toast'
 import { deleteEmployee } from '@/lib/api'
+import type { Employee } from '@/lib/supabase'
 import EmployeeTable from '@/components/employees/EmployeeTable'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 function EmployeeCard({ 
   employee, 
@@ -272,6 +284,9 @@ const Employees: React.FC = () => {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [employeeToDelete, setEmployeeToDelete] = useState<any>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const { data: employees, isLoading: isEmployeesLoading } = useEmployees()
   const { data: settings, isLoading: isSettingsLoading } = usePayrollSettings()
 
@@ -285,6 +300,64 @@ const Employees: React.FC = () => {
       employee.position.toLowerCase().includes(searchTerm.toLowerCase())
     )
   }, [employees, searchTerm])
+
+  const handleDeleteClick = (employee: any) => {
+    setEmployeeToDelete(employee)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!employeeToDelete) return
+    
+    setIsDeleting(true)
+    const employeeIdToDelete = employeeToDelete.id
+    const employeeName = employeeToDelete.name
+    
+    // Optimistically remove from cache immediately for instant UI update
+    queryClient.setQueryData<Employee[]>(['employees'], (oldData) => {
+      if (!oldData) return oldData
+      return oldData.filter(emp => emp.id !== employeeIdToDelete)
+    })
+    
+    // Close dialog immediately for better UX
+    setDeleteDialogOpen(false)
+    setEmployeeToDelete(null)
+    
+    try {
+      // Perform the actual deletion
+      await deleteEmployee(employeeIdToDelete)
+      
+      // Force a fresh refetch from server to ensure consistency
+      await Promise.all([
+        queryClient.refetchQueries({ 
+          queryKey: ['employees'],
+          type: 'active',
+        }),
+        queryClient.refetchQueries({ 
+          queryKey: ['dashboard-stats'],
+          type: 'active',
+        }),
+      ])
+      
+      toast({ 
+        title: 'Employee deleted', 
+        description: `${employeeName} has been removed successfully.`,
+        className: 'bg-green-600 text-white border-green-700'
+      })
+    } catch (err: any) {
+      // Rollback on error - invalidate and refetch to restore correct state
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      await queryClient.refetchQueries({ queryKey: ['employees'] })
+      
+      toast({ 
+        title: 'Delete failed', 
+        description: err?.message || 'Could not delete employee. Please try again.', 
+        variant: 'destructive' 
+      })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background w-full overflow-x-hidden">
@@ -343,22 +416,7 @@ const Employees: React.FC = () => {
                 employee={employee} 
                 settings={settings}
                 onEdit={(e) => navigate(`/employees/${e.id}`)}
-                onDelete={async (e) => {
-                  if (!confirm(`Delete ${e.name} (${e.employee_id})? This cannot be undone.`)) return
-                  try {
-                    await deleteEmployee(e.id)
-                    toast({ title: 'Employee deleted', description: `${e.name} removed.` })
-                    // Invalidate and refetch to update the list immediately
-                    queryClient.invalidateQueries({ queryKey: ['employees'] })
-                    queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-                    await Promise.all([
-                      queryClient.refetchQueries({ queryKey: ['employees'] }),
-                      queryClient.refetchQueries({ queryKey: ['dashboard-stats'] }),
-                    ])
-                  } catch (err: any) {
-                    toast({ title: 'Delete failed', description: err?.message || 'Could not delete employee', variant: 'destructive' })
-                  }
-                }}
+                onDelete={handleDeleteClick}
               />
             ))
           )}
@@ -369,24 +427,56 @@ const Employees: React.FC = () => {
             employees={filteredEmployees as any}
             onView={(e: any) => navigate(`/employees/${e.id}`)}
             onEdit={(e: any) => navigate(`/employees/${e.id}`)}
-            onDelete={async (e: any) => {
-              if (!confirm(`Delete ${e.name} (${e.employee_id})? This cannot be undone.`)) return
-              try {
-                await deleteEmployee(e.id)
-                toast({ title: 'Employee deleted', description: `${e.name} removed.` })
-                // Invalidate and refetch to update the list immediately
-                queryClient.invalidateQueries({ queryKey: ['employees'] })
-                queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-                await Promise.all([
-                  queryClient.refetchQueries({ queryKey: ['employees'] }),
-                  queryClient.refetchQueries({ queryKey: ['dashboard-stats'] }),
-                ])
-              } catch (err: any) {
-                toast({ title: 'Delete failed', description: err?.message || 'Could not delete employee', variant: 'destructive' })
-              }
-            }}
+            onDelete={handleDeleteClick}
           />
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent className="sm:max-w-[425px]">
+            <AlertDialogHeader>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                  <AlertTriangle className="h-6 w-6 text-destructive" />
+                </div>
+                <div className="flex-1">
+                  <AlertDialogTitle className="text-xl font-semibold">
+                    Delete Employee?
+                  </AlertDialogTitle>
+                </div>
+              </div>
+              <AlertDialogDescription className="text-base pt-2">
+                Are you sure you want to delete <span className="font-semibold text-foreground">{employeeToDelete?.name}</span> ({employeeToDelete?.employee_id})?
+                <br />
+                <span className="text-sm text-destructive font-medium mt-2 block">
+                  This action cannot be undone.
+                </span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="sm:flex-row sm:justify-end gap-2 mt-4">
+              <AlertDialogCancel disabled={isDeleting}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:ring-destructive"
+              >
+                {isDeleting ? (
+                  <>
+                    <span className="inline-block animate-spin mr-2">⏳</span>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {filteredEmployees.length === 0 && !isLoading && (
           <Card className="text-center py-12">
