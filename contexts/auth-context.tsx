@@ -57,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null)
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth_token')
+        localStorage.removeItem('last_activity_time') // Clear inactivity tracking
         // Clear browser history to prevent back button access
         window.history.replaceState(null, '', window.location.href)
       }
