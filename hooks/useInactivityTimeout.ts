@@ -35,7 +35,23 @@ export function useInactivityTimeout({
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null)
   const warningTimerRef = useRef<NodeJS.Timeout | null>(null)
   const warningShownRef = useRef(false)
-  const lastActivityRef = useRef<number>(Date.now())
+  const STORAGE_KEY = 'last_activity_time'
+  
+  // Get last activity time from localStorage or use current time
+  const getLastActivityTime = (): number => {
+    if (typeof window === 'undefined') return Date.now()
+    const stored = localStorage.getItem(STORAGE_KEY)
+    return stored ? parseInt(stored, 10) : Date.now()
+  }
+  
+  // Save last activity time to localStorage
+  const saveLastActivityTime = (time: number) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, time.toString())
+    }
+  }
+  
+  const lastActivityRef = useRef<number>(getLastActivityTime())
   const tabHiddenTimeRef = useRef<number | null>(null) // Track when tab was hidden
 
   // Reset timers when user is active
@@ -44,6 +60,7 @@ export function useInactivityTimeout({
 
     const now = Date.now()
     lastActivityRef.current = now
+    saveLastActivityTime(now) // Persist to localStorage
     warningShownRef.current = false
 
     // Clear existing timers
@@ -102,7 +119,10 @@ export function useInactivityTimeout({
 
     // Check if user has been inactive too long when component mounts
     // This handles cases where page was refreshed or reopened
-    const timeSinceLastActivity = Date.now() - lastActivityRef.current
+    // Re-read from localStorage to get accurate last activity time
+    const lastActivity = getLastActivityTime()
+    lastActivityRef.current = lastActivity
+    const timeSinceLastActivity = Date.now() - lastActivity
     const totalTimeout = inactivityTimeout + warningTimeout
     
     if (timeSinceLastActivity >= totalTimeout) {
