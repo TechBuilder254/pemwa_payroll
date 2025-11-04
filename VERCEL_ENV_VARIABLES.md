@@ -91,7 +91,7 @@ NODE_ENV
 
 ## Database Keep-Alive Cron Job
 
-The system includes an automated cron job that pings the database every 2 hours to prevent Supabase from putting it to sleep. This runs automatically via Vercel Cron Jobs.
+The system includes an automated cron job that pings the database once per day to prevent Supabase from putting it to sleep. This runs automatically via Vercel Cron Jobs.
 
 **Cron Schedule**: Once per day at 12:00 UTC (`0 12 * * *`) - Hobby plan compatible
 
