@@ -36,6 +36,7 @@ export function useInactivityTimeout({
   const warningTimerRef = useRef<NodeJS.Timeout | null>(null)
   const warningShownRef = useRef(false)
   const lastActivityRef = useRef<number>(Date.now())
+  const tabHiddenTimeRef = useRef<number | null>(null) // Track when tab was hidden
 
   // Reset timers when user is active
   const resetTimers = useCallback(() => {
@@ -132,10 +133,57 @@ export function useInactivityTimeout({
       window.addEventListener(event, handleActivity, { passive: true })
     })
 
-    // Also track visibility changes (tab focus)
+    // Track visibility changes (tab focus/blur)
+    // This is critical for detecting when user switches tabs or goes to another website
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && !warningShownRef.current) {
-        resetTimers()
+      if (document.visibilityState === 'hidden') {
+        // Tab was hidden - record the time
+        tabHiddenTimeRef.current = Date.now()
+        console.log('[InactivityTimeout] Tab hidden at:', new Date(tabHiddenTimeRef.current).toISOString())
+      } else if (document.visibilityState === 'visible') {
+        // Tab became visible again - check how long it was hidden
+        if (tabHiddenTimeRef.current !== null) {
+          const timeHidden = Date.now() - tabHiddenTimeRef.current
+          const timeSinceLastActivity = Date.now() - lastActivityRef.current
+          const totalInactiveTime = Math.max(timeHidden, timeSinceLastActivity)
+          
+          console.log('[InactivityTimeout] Tab visible again after:', Math.round(timeHidden / 1000), 'seconds')
+          console.log('[InactivityTimeout] Total inactive time:', Math.round(totalInactiveTime / 1000), 'seconds')
+          
+          // If user was away longer than inactivity timeout + warning timeout, log them out immediately
+          const totalTimeout = inactivityTimeout + warningTimeout
+          if (totalInactiveTime >= totalTimeout) {
+            console.log('[InactivityTimeout] User was away too long - logging out immediately')
+            onLogout()
+            return
+          }
+          
+          // If user was away longer than inactivity timeout, show warning immediately
+          if (totalInactiveTime >= inactivityTimeout) {
+            console.log('[InactivityTimeout] User was away longer than inactivity timeout - showing warning')
+            warningShownRef.current = true
+            onWarning()
+            
+            // Calculate remaining warning time
+            const remainingWarningTime = totalTimeout - totalInactiveTime
+            if (remainingWarningTime > 0) {
+              warningTimerRef.current = setTimeout(() => {
+                onLogout()
+              }, remainingWarningTime)
+            } else {
+              // No time left, logout immediately
+              onLogout()
+            }
+            return
+          }
+        }
+        
+        // If user wasn't away too long, reset timers normally
+        if (!warningShownRef.current) {
+          resetTimers()
+        }
+        
+        tabHiddenTimeRef.current = null
       }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
