@@ -114,15 +114,15 @@ export function Header() {
           </div>
         </div>
         
-        {/* Right side - Theme Toggle and User Profile (desktop/tablet) */}
+        {/* Right side - Theme Toggle and User Profile */}
         {pathname !== '/login' && (
-          <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            {/* Theme Toggle */}
-            <div className="p-1 sm:p-1.5 rounded-lg border border-border/50 bg-card/50 hover:bg-card/80 transition-colors">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {/* Theme Toggle - Always visible on all screen sizes */}
+            <div className="p-1 sm:p-1.5 rounded-lg border border-border/50 bg-card/50 hover:bg-card/80 transition-colors z-10">
               <ThemeToggle />
             </div>
             
-            {/* User Profile */}
+            {/* User Profile - Show on all screen sizes */}
             {user && (
               <Popover open={profileOpen} onOpenChange={setProfileOpen}>
                 <PopoverTrigger asChild>
@@ -145,7 +145,7 @@ export function Header() {
                         {user.email}
                       </p>
                     </div>
-                    <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                    <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0 hidden sm:block" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent 
@@ -188,15 +188,6 @@ export function Header() {
                 </PopoverContent>
               </Popover>
             )}
-          </div>
-        )}
-
-        {/* Mobile-only quick theme toggle (always visible) */}
-        {pathname !== '/login' && (
-          <div className="sm:hidden absolute right-3 top-1/2 -translate-y-1/2">
-            <div className="p-1 rounded-lg border border-border/50 bg-card/60 backdrop-blur hover:bg-card/80 transition-colors">
-              <ThemeToggle />
-            </div>
           </div>
         )}
       </div>
