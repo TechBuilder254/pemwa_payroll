@@ -113,8 +113,8 @@ export function Navigation() {
                     </Button>
                   </div>
                   
-                  {/* Navigation Items - Compact, no scroll needed */}
-                  <div className="flex-1 overflow-hidden px-2 py-1.5 space-y-1 flex flex-col">
+                  {/* Navigation Items - Compact, no scroll needed, all items visible */}
+                  <div className="flex-1 px-2 py-1 space-y-0.5 flex flex-col justify-start overflow-visible">
                     {navigation.map((item) => {
                       const Icon = item.icon
                       const isActive = pathname === item.href
@@ -125,7 +125,7 @@ export function Navigation() {
                           to={item.href}
                           onClick={() => setIsOpen(false)}
                           className={cn(
-                            "flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 border flex-shrink-0",
+                            "flex items-center space-x-2 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-300 border flex-shrink-0",
                             isActive
                               ? "bg-gradient-to-r from-primary via-primary to-primary/90 text-primary-foreground shadow-lg border-primary/50"
                               : "text-slate-700 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-foreground hover:bg-card/80 border-transparent hover:border-border/50"
