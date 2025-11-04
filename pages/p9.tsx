@@ -29,6 +29,7 @@ import {
   Info
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/payroll-calculations'
+import { getAnnualTaxReturnDueDate, getDueDateMessage } from '@/lib/kenyan-due-dates'
 import { useEmployees } from '@/hooks/useEmployees'
 import { useP9Form } from '@/hooks/useP9Form'
 import { generateP9PDF } from '@/lib/exports/pdf'
@@ -713,6 +714,10 @@ export default function P9Page() {
     }
   }, [p9Form, viewingP9])
 
+  // Calculate annual tax return due date (last day of February following tax year)
+  const annualDueDateInfo = selectedYear ? getAnnualTaxReturnDueDate(Number(selectedYear)) : null
+  const annualDueDateMessage = annualDueDateInfo ? getDueDateMessage(annualDueDateInfo, 'annual') : null
+
   if (viewingP9) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 w-full overflow-x-hidden">
@@ -853,6 +858,72 @@ export default function P9Page() {
         "p-4 sm:p-6",
         shouldExpand ? "sm:px-4" : "sm:px-6"
       )}>
+        {/* Annual Tax Return Due Date Alert */}
+        {selectedYear && annualDueDateInfo && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <Card className={cn(
+              "border-2",
+              annualDueDateInfo.isOverdue 
+                ? "border-red-500 bg-red-50 dark:bg-red-950/20" 
+                : annualDueDateInfo.isDueSoon
+                ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20"
+                : "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
+            )}>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "p-2 rounded-lg",
+                      annualDueDateInfo.isOverdue 
+                        ? "bg-red-500/20" 
+                        : annualDueDateInfo.isDueSoon
+                        ? "bg-yellow-500/20"
+                        : "bg-blue-500/20"
+                    )}>
+                      <Calendar className={cn(
+                        "h-5 w-5",
+                        annualDueDateInfo.isOverdue 
+                          ? "text-red-600 dark:text-red-400" 
+                          : annualDueDateInfo.isDueSoon
+                          ? "text-yellow-600 dark:text-yellow-400"
+                          : "text-blue-600 dark:text-blue-400"
+                      )} />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm text-foreground">
+                        {annualDueDateInfo.isOverdue 
+                          ? '⚠️ Annual Tax Return (P9/P10) Overdue!' 
+                          : annualDueDateInfo.isDueSoon
+                          ? '⏰ Annual Tax Return Due Soon'
+                          : '📅 Annual Tax Return Due Date'}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        Tax Year {selectedYear}: Deadline <span className="font-medium">{annualDueDateInfo.dueDateFormatted}</span> • {annualDueDateMessage}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Annual P9/P10 returns must be submitted to KRA by the last day of February following the tax year
+                      </div>
+                    </div>
+                  </div>
+                  {annualDueDateInfo.isOverdue && (
+                    <Badge variant="destructive" className="text-sm px-3 py-1">
+                      OVERDUE
+                    </Badge>
+                  )}
+                  {annualDueDateInfo.isDueSoon && !annualDueDateInfo.isOverdue && (
+                    <Badge variant="outline" className="text-sm px-3 py-1 border-yellow-500 text-yellow-700 dark:text-yellow-400">
+                      DUE SOON
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-200/50">

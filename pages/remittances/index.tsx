@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { formatCurrency } from '@/lib/payroll-calculations'
+import { getMonthlyRemittanceDueDate, getDueDateMessage } from '@/lib/kenyan-due-dates'
 import { generateRemittancePDF } from '@/lib/exports/pdf'
 import { generateRemittanceExcel } from '@/lib/exports/excel'
 import { useRemittances } from '@/hooks/useRemittances'
@@ -579,6 +580,10 @@ export default function RemittancesPage() {
   const totalEmployerRemittances = totals.nssfEmployer + totals.ahlEmployer // NSSF + AHL, employer does NOT pay SHIF
   const totalEmployeeRemittances = totals.nssfEmployee + totals.shifEmployee + totals.ahlEmployee + totals.payeTotal // Employee portion only
 
+  // Calculate Kenyan government due date (9th of following month)
+  const dueDateInfo = getMonthlyRemittanceDueDate(selectedMonth)
+  const dueDateMessage = getDueDateMessage(dueDateInfo, 'monthly')
+
   const handleExportPDF = async () => {
     if (!currentRemittance) return
     setIsExporting(true)
@@ -690,6 +695,72 @@ export default function RemittancesPage() {
         "w-full min-w-0 space-y-6 transition-all duration-300",
         "p-4 sm:p-6"
       )}>
+        {/* Due Date Alert */}
+        {currentRemittance && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <Card className={cn(
+              "border-2",
+              dueDateInfo.isOverdue 
+                ? "border-red-500 bg-red-50 dark:bg-red-950/20" 
+                : dueDateInfo.isDueSoon
+                ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20"
+                : "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
+            )}>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "p-2 rounded-lg",
+                      dueDateInfo.isOverdue 
+                        ? "bg-red-500/20" 
+                        : dueDateInfo.isDueSoon
+                        ? "bg-yellow-500/20"
+                        : "bg-blue-500/20"
+                    )}>
+                      <Calendar className={cn(
+                        "h-5 w-5",
+                        dueDateInfo.isOverdue 
+                          ? "text-red-600 dark:text-red-400" 
+                          : dueDateInfo.isDueSoon
+                          ? "text-yellow-600 dark:text-yellow-400"
+                          : "text-blue-600 dark:text-blue-400"
+                      )} />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm text-foreground">
+                        {dueDateInfo.isOverdue 
+                          ? '⚠️ Remittance Overdue!' 
+                          : dueDateInfo.isDueSoon
+                          ? '⏰ Remittance Due Soon'
+                          : '📅 Remittance Due Date'}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        Deadline: <span className="font-medium">{dueDateInfo.dueDateFormatted}</span> • {dueDateMessage}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        All remittances (PAYE, NSSF, SHIF, AHL) must be submitted to KRA by the 9th of the following month
+                      </div>
+                    </div>
+                  </div>
+                  {dueDateInfo.isOverdue && (
+                    <Badge variant="destructive" className="text-sm px-3 py-1">
+                      OVERDUE
+                    </Badge>
+                  )}
+                  {dueDateInfo.isDueSoon && !dueDateInfo.isOverdue && (
+                    <Badge variant="outline" className="text-sm px-3 py-1 border-yellow-500 text-yellow-700 dark:text-yellow-400">
+                      DUE SOON
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
         {/* Prominent Government Remittances Summary */}
         {currentRemittance && (
           <motion.div
@@ -714,8 +785,25 @@ export default function RemittancesPage() {
                     <div className="text-3xl sm:text-4xl font-bold text-red-600 dark:text-red-400">
                       {formatCurrency(totalGovernmentRemittances)}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Due: {new Date(selectedMonth + '-09').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    <div className={cn(
+                      "text-xs font-medium mt-1",
+                      dueDateInfo.isOverdue 
+                        ? "text-red-600 dark:text-red-400" 
+                        : dueDateInfo.isDueSoon
+                        ? "text-yellow-600 dark:text-yellow-400"
+                        : "text-muted-foreground"
+                    )}>
+                      Due: {dueDateInfo.dueDateFormatted}
+                    </div>
+                    <div className={cn(
+                      "text-[10px] mt-0.5",
+                      dueDateInfo.isOverdue 
+                        ? "text-red-600 dark:text-red-400 font-semibold" 
+                        : dueDateInfo.isDueSoon
+                        ? "text-yellow-600 dark:text-yellow-400"
+                        : "text-muted-foreground"
+                    )}>
+                      {dueDateMessage}
                     </div>
                   </div>
                 </div>

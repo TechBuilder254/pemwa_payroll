@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { useSidebar } from '@/contexts/sidebar-context'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { formatCurrency, calculatePayroll } from '@/lib/payroll-calculations'
 import { useEmployees } from '@/hooks/useEmployees'
+import { fetchEmployees } from '@/lib/api'
 import { usePayrollSettings } from '@/hooks/usePayrollSettings'
 import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/use-toast'
@@ -280,6 +281,7 @@ function EmployeesSkeleton() {
 
 const Employees: React.FC = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { shouldExpand } = useSidebar()
   const queryClient = useQueryClient()
   const { toast } = useToast()
@@ -287,10 +289,49 @@ const Employees: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [employeeToDelete, setEmployeeToDelete] = useState<any>(null)
   const [isDeleting, setIsDeleting] = useState(false)
-  const { data: employees, isLoading: isEmployeesLoading } = useEmployees()
+  const { data: employees, isLoading: isEmployeesLoading, refetch: refetchEmployees } = useEmployees()
   const { data: settings, isLoading: isSettingsLoading } = usePayrollSettings()
+  const hasRefetchedRef = useRef(false)
 
   const isLoading = isEmployeesLoading || isSettingsLoading
+
+  // CRITICAL: Force refetch employees list when navigating to this page
+  // This ensures fresh data is always displayed, especially after creating/editing employees
+  useEffect(() => {
+    // Force immediate refetch when component mounts or location changes to /employees
+    if (location.pathname === '/employees') {
+      const refetch = async () => {
+        try {
+          // Remove and clear query from cache first to force fresh fetch
+          queryClient.removeQueries({ queryKey: ['employees'], exact: true })
+          queryClient.setQueryData(['employees'], undefined)
+          
+          // Wait a bit for cache to clear and navigation to complete
+          await new Promise(resolve => setTimeout(resolve, 150))
+          
+          // Method 1: Try refetchEmployees first
+          try {
+            const result = await refetchEmployees()
+            if (result.data) {
+              console.log('[Employees] Refetched via hook:', result.data.length, 'employees')
+              return
+            }
+          } catch (refetchError) {
+            console.warn('[Employees] Hook refetch failed, trying direct fetch:', refetchError)
+          }
+          
+          // Method 2: Fallback - direct fetch and update cache
+          const freshData = await fetchEmployees()
+          queryClient.setQueryData(['employees'], freshData)
+          console.log('[Employees] Direct fetch successful:', freshData.length, 'employees')
+        } catch (error) {
+          console.error('[Employees] Refetch error:', error)
+        }
+      }
+      
+      refetch()
+    }
+  }, [location.pathname, queryClient, refetchEmployees])
 
   const filteredEmployees = useMemo(() => {
     const list = employees ?? []

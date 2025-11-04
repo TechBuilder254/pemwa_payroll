@@ -1,7 +1,15 @@
 import type { Employee, PayrollSettings } from '@/lib/supabase'
 
 export async function fetchEmployees(): Promise<Employee[]> {
-  const res = await fetch('/api/employees')
+  // Add cache-busting to ensure fresh data
+  const timestamp = new Date().getTime()
+  const res = await fetch(`/api/employees?t=${timestamp}`, {
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+    },
+  })
   if (!res.ok) throw new Error('Failed to fetch employees')
   const json = await res.json()
   return json.data as Employee[]

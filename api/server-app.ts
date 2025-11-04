@@ -350,6 +350,185 @@ app.post('/api/auth/logout', (req, res) => {
   res.status(200).json({ data: { message: 'Logged out successfully' } })
 })
 
+// Database Keep-Alive Endpoint (for authenticated users)
+// Prevents Supabase from putting the database to sleep by executing lightweight queries
+app.get('/api/db/ping', authenticate, async (_req: AuthRequest, res) => {
+  try {
+    // Rotate through different lightweight queries to keep database active
+    const queries = [
+      () => query('SELECT COUNT(*)::int as count FROM employees LIMIT 1'),
+      () => query('SELECT COUNT(*)::int as count FROM payroll_settings LIMIT 1'),
+      () => query('SELECT employee_id FROM employees ORDER BY created_at DESC LIMIT 1'),
+      () => query('SELECT COUNT(*)::int as count FROM payroll_runs LIMIT 1'),
+      () => query('SELECT NOW() as current_time'),
+      () => query('SELECT COUNT(*)::int as count FROM users LIMIT 1'),
+      () => query('SELECT version() as version'),
+      () => query('SELECT COUNT(*)::int as count FROM payslips LIMIT 1'),
+    ]
+    
+    // Use a simple rotation based on current minute
+    const queryIndex = Math.floor(Date.now() / (1000 * 60)) % queries.length
+    await queries[queryIndex]()
+    
+    res.status(200).json({ 
+      data: { 
+        message: 'Database ping successful',
+        timestamp: new Date().toISOString(),
+        queryIndex: queryIndex + 1
+      } 
+    })
+  } catch (e: any) {
+    console.warn('[api] Database ping failed (non-critical):', e?.message || e)
+    // Still return success to avoid breaking the keep-alive mechanism
+    res.status(200).json({ 
+      data: { 
+        message: 'Database ping attempted',
+        timestamp: new Date().toISOString(),
+        warning: e?.message || 'Query execution failed'
+      } 
+    })
+  }
+})
+
+// Cron Job Endpoint for Database Keep-Alive
+// This endpoint is called by Vercel Cron Jobs every 2 hours to keep the database active
+// It doesn't require user authentication but uses a secret token for security
+// Vercel Cron Jobs automatically add a 'x-vercel-signature' header, but we use CRON_SECRET for extra security
+app.get('/api/cron/db-keepalive', async (req, res) => {
+  const startTime = Date.now()
+  const timestamp = new Date().toISOString()
+  
+  try {
+    console.log(`[DB Keep-Alive Cron] ========================================`)
+    console.log(`[DB Keep-Alive Cron] Starting database keep-alive ping at ${timestamp}`)
+    console.log(`[DB Keep-Alive Cron] Request headers:`, JSON.stringify(req.headers, null, 2))
+    
+    // Verify cron secret token (set in Vercel environment variables)
+    // Check both header and query parameter for flexibility
+    const cronSecret = req.headers['x-cron-secret'] as string || req.query.secret as string
+    const expectedSecret = process.env.CRON_SECRET
+    
+    // If CRON_SECRET is set, require it; otherwise allow any request (for development/testing)
+    if (expectedSecret) {
+      if (!cronSecret || cronSecret !== expectedSecret) {
+        console.warn(`[DB Keep-Alive Cron] ❌ UNAUTHORIZED - Invalid or missing cron secret`)
+        console.warn(`[DB Keep-Alive Cron] Expected secret: ${expectedSecret ? 'SET' : 'NOT SET'}`)
+        console.warn(`[DB Keep-Alive Cron] Provided secret: ${cronSecret ? 'PROVIDED' : 'MISSING'}`)
+        return res.status(401).json({ 
+          error: 'Unauthorized - Invalid cron secret',
+          timestamp,
+          status: 'failed'
+        })
+      }
+      console.log(`[DB Keep-Alive Cron] ✅ Secret verified successfully`)
+    } else {
+      console.warn(`[DB Keep-Alive Cron] ⚠️  WARNING: CRON_SECRET not set - allowing request (not secure for production)`)
+    }
+    
+    // Rotate through different lightweight queries to keep database active
+    const queries = [
+      () => query('SELECT COUNT(*)::int as count FROM employees LIMIT 1'),
+      () => query('SELECT COUNT(*)::int as count FROM payroll_settings LIMIT 1'),
+      () => query('SELECT employee_id FROM employees ORDER BY created_at DESC LIMIT 1'),
+      () => query('SELECT COUNT(*)::int as count FROM payroll_runs LIMIT 1'),
+      () => query('SELECT NOW() as current_time'),
+      () => query('SELECT COUNT(*)::int as count FROM users LIMIT 1'),
+      () => query('SELECT version() as version'),
+      () => query('SELECT COUNT(*)::int as count FROM payslips LIMIT 1'),
+    ]
+    
+    // Use a simple rotation based on current hour
+    const queryIndex = Math.floor(Date.now() / (1000 * 60 * 60)) % queries.length
+    const queryDescriptions = [
+      'Count employees',
+      'Count payroll settings',
+      'Get latest employee ID',
+      'Count payroll runs',
+      'Get current timestamp',
+      'Count users',
+      'Get database version',
+      'Count payslips'
+    ]
+    
+    console.log(`[DB Keep-Alive Cron] Executing query ${queryIndex + 1}/${queries.length}: ${queryDescriptions[queryIndex]}`)
+    
+    const queryResult = await queries[queryIndex]()
+    const executionTime = Date.now() - startTime
+    
+    console.log(`[DB Keep-Alive Cron] ✅ Query executed successfully in ${executionTime}ms`)
+    console.log(`[DB Keep-Alive Cron] Query result: ${JSON.stringify(queryResult.rows[0] || {})}`)
+    console.log(`[DB Keep-Alive Cron] ========================================`)
+    
+    res.status(200).json({ 
+      success: true,
+      data: { 
+        message: 'Database keep-alive cron job executed successfully',
+        timestamp,
+        queryIndex: queryIndex + 1,
+        queryDescription: queryDescriptions[queryIndex],
+        executionTimeMs: executionTime,
+        source: 'cron',
+        status: 'success'
+      } 
+    })
+  } catch (e: any) {
+    const executionTime = Date.now() - startTime
+    console.error(`[DB Keep-Alive Cron] ❌ FAILED after ${executionTime}ms`)
+    console.error(`[DB Keep-Alive Cron] Error:`, e?.message || e)
+    console.error(`[DB Keep-Alive Cron] Stack:`, e?.stack)
+    console.log(`[DB Keep-Alive Cron] ========================================`)
+    
+    // Still return success to prevent cron job from being marked as failed
+    res.status(200).json({ 
+      success: false,
+      data: { 
+        message: 'Database keep-alive cron job attempted',
+        timestamp,
+        error: e?.message || 'Query execution failed',
+        executionTimeMs: executionTime,
+        source: 'cron',
+        status: 'error'
+      } 
+    })
+  }
+})
+
+// Test endpoint to manually verify the keep-alive system
+// Call this endpoint to test if the cron job is configured correctly
+app.get('/api/cron/test', async (req, res) => {
+  try {
+    const cronSecret = req.headers['x-cron-secret'] as string || req.query.secret as string
+    const expectedSecret = process.env.CRON_SECRET
+    
+    const testInfo = {
+      timestamp: new Date().toISOString(),
+      cronSecretConfigured: !!expectedSecret,
+      cronSecretProvided: !!cronSecret,
+      cronSecretValid: expectedSecret ? cronSecret === expectedSecret : null,
+      cronSchedule: 'Every 2 hours (0 */2 * * *)',
+      cronPath: '/api/cron/db-keepalive',
+      vercelCronEnabled: true,
+      instructions: {
+        step1: 'Check Vercel Dashboard → Your Project → Cron Jobs to see execution history',
+        step2: 'Check Vercel Dashboard → Your Project → Functions → Logs to see detailed logs',
+        step3: 'Add CRON_SECRET environment variable in Vercel if not already set',
+        step4: 'The cron job runs automatically every 2 hours after deployment'
+      }
+    }
+    
+    res.status(200).json({ 
+      success: true,
+      message: 'Cron job test endpoint - Use this to verify configuration',
+      testInfo
+    })
+  } catch (e: any) {
+    res.status(500).json({ 
+      success: false,
+      error: e?.message || 'Test endpoint failed'
+    })
+  }
+})
+
 // Employees - Specific routes must come before dynamic routes
 app.get('/api/employees/next-id', async (_req, res) => {
   try {

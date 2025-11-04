@@ -17,6 +17,7 @@ import Login from '@/src/routes/Login'
 import EmployeeDetails from '@/src/routes/EmployeeDetails'
 import { ScrollToTop } from '@/src/components/ScrollToTop'
 import { InactivityTimeout } from '@/components/InactivityTimeout'
+import { startDbKeepAlive, stopDbKeepAlive } from '@/lib/db-keepalive'
 
 import { useSidebar } from '@/contexts/sidebar-context'
 import { useAuth } from '@/contexts/auth-context'
@@ -27,6 +28,23 @@ const App: React.FC = () => {
   const sidebarPad = shouldExpand ? 'lg:pl-[200px]' : 'lg:pl-[56px]'
   const location = useLocation()
   const mainRef = React.useRef<HTMLElement>(null)
+  
+  // Start database keep-alive service when authenticated
+  // This prevents Supabase from putting the database to sleep
+  React.useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      // Start keep-alive: ping database every 2 hours (7200000 ms)
+      startDbKeepAlive(2 * 60 * 60 * 1000)
+      
+      return () => {
+        // Stop keep-alive when component unmounts or user logs out
+        stopDbKeepAlive()
+      }
+    } else {
+      // Stop keep-alive when not authenticated
+      stopDbKeepAlive()
+    }
+  }, [isAuthenticated, isLoading])
   
   // Scroll main container to top on route change
   React.useEffect(() => {

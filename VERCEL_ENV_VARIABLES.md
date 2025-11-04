@@ -20,6 +20,7 @@ VITE_SUPABASE_ANON_KEY=your-anon-key-here
 SESSION_SECRET=generate-random-secret-here
 JWT_SECRET=generate-random-secret-here
 JWT_EXPIRES_IN=7d
+CRON_SECRET=generate-random-secret-here-for-cron-jobs
 ```
 
 ### Environment
@@ -82,6 +83,20 @@ VITE_SUPABASE_ANON_KEY
 SESSION_SECRET
 JWT_SECRET
 JWT_EXPIRES_IN
+CRON_SECRET
 NODE_ENV
 ```
+
+---
+
+## Database Keep-Alive Cron Job
+
+The system includes an automated cron job that pings the database every 2 hours to prevent Supabase from putting it to sleep. This runs automatically via Vercel Cron Jobs.
+
+**Cron Schedule**: Every 2 hours (`0 */2 * * *`)
+
+**Important**: 
+- The cron job requires the `CRON_SECRET` environment variable to be set
+- Generate a random secret for `CRON_SECRET` (same method as other secrets)
+- The cron job will run automatically after deployment - no manual setup needed
 

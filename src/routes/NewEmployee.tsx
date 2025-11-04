@@ -137,18 +137,6 @@ function EmployeeForm() {
           voluntary_deductions: formData.voluntary_deductions as any,
         } as any)
         
-        // Immediately update the query cache with the updated employee data (instant UI update)
-        queryClient.setQueryData(['employees'], (oldEmployees: any[] | undefined) => {
-          if (!oldEmployees) return [savedEmployee]
-          const existingIndex = oldEmployees.findIndex((e: any) => e.id === savedEmployee.id)
-          if (existingIndex >= 0) {
-            const updated = [...oldEmployees]
-            updated[existingIndex] = savedEmployee
-            return updated
-          }
-          return [...oldEmployees, savedEmployee]
-        })
-        
         toast({ 
           title: 'Success!', 
           description: 'Employee has been updated successfully.', 
@@ -165,12 +153,6 @@ function EmployeeForm() {
           helb_amount: formData.helb_amount,
           voluntary_deductions: formData.voluntary_deductions as any,
         } as any)
-
-        // Immediately update the query cache with the new employee data (instant UI update)
-        queryClient.setQueryData(['employees'], (oldEmployees: any[] | undefined) => {
-          if (!oldEmployees) return [savedEmployee]
-          return [...oldEmployees, savedEmployee]
-        })
         
         // Invalidate next employee ID only for new employees
         queryClient.invalidateQueries({ queryKey: ['next-employee-id'] })
@@ -182,15 +164,19 @@ function EmployeeForm() {
         })
       }
       
-      // Invalidate queries in background (don't wait) - cache already updated above for instant UI
-      queryClient.invalidateQueries({ queryKey: ['employees'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-      // Refetch in background without blocking
-      queryClient.refetchQueries({ queryKey: ['employees'] }).catch(() => {})
-      queryClient.refetchQueries({ queryKey: ['dashboard-stats'] }).catch(() => {})
+      // CRITICAL: Completely reset and remove queries to force fresh fetch
+      // This ensures the Employees page will fetch completely fresh data from database
+      queryClient.removeQueries({ queryKey: ['employees'], exact: true })
+      queryClient.setQueryData(['employees'], undefined) // Clear any cached data
+      queryClient.invalidateQueries({ queryKey: ['employees'], exact: true })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'], exact: true })
       
-      // Navigate immediately - UI already updated via setQueryData above
-      navigate('/employees')
+      // Small delay to ensure database commit is fully processed
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
+      // Navigate - the Employees component will automatically refetch fresh data
+      // because we cleared the cache and have refetchOnMount: true
+      navigate('/employees', { replace: false })
     } catch (error: any) {
       toast({ 
         title: 'Error', 

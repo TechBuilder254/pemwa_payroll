@@ -4,7 +4,7 @@ import { InactivityTimeoutModal } from './InactivityTimeoutModal'
 import { useAuth } from '@/contexts/auth-context'
 
 interface InactivityTimeoutProps {
-  /** Time in milliseconds before showing warning (default: 1 minute for testing) */
+  /** Time in milliseconds before showing warning (default: 10 minutes) */
   inactivityTimeout?: number
   /** Time in milliseconds for warning countdown (default: 60 seconds) */
   warningTimeout?: number
@@ -13,12 +13,12 @@ interface InactivityTimeoutProps {
 /**
  * Component that handles inactivity timeout and shows warning modal
  * 
- * For testing: Uses 1 minute inactivity timeout
- * For production: Change to 10 minutes (10 * 60 * 1000)
+ * Inactivity timeout: 10 minutes before showing warning
+ * Warning countdown: 60 seconds before automatic logout
  */
 export function InactivityTimeout({
-  inactivityTimeout = 60 * 1000, // 1 minute for testing (change to 10 * 60 * 1000 for production)
-  warningTimeout = 60 * 1000, // 60 seconds warning countdown
+  inactivityTimeout = 10 * 60 * 1000, // 10 minutes inactivity timeout
+  warningTimeout = 60 * 1000, // 60 seconds warning countdown before logout
 }: InactivityTimeoutProps) {
   const { isAuthenticated, logout } = useAuth()
   const [showWarning, setShowWarning] = useState(false)
