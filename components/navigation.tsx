@@ -87,7 +87,7 @@ export function Navigation() {
                 animate={prefersReducedMotion ? {} : { opacity: 1, x: 0 }}
                 exit={prefersReducedMotion ? {} : { opacity: 0, x: "100%" }}
                 transition={prefersReducedMotion ? { duration: 0 } : { type: "spring", damping: 25, stiffness: 200 }}
-                className="fixed top-0 right-0 h-screen w-64 max-w-[75vw] bg-background border-l shadow-xl z-50"
+                className="fixed top-0 right-0 h-3/4 w-64 max-w-[75vw] bg-background border-l shadow-xl z-50 rounded-b-lg"
                 id="mobile-nav-drawer"
                 role="dialog"
                 aria-modal="true"
