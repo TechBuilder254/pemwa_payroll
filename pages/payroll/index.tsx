@@ -612,50 +612,10 @@ export default function PayrollPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 w-full overflow-x-hidden">
-      {/* Mobile Header */}
-      <div className="sm:hidden px-4 py-6 border-b bg-card/80 backdrop-blur-sm">
-        <div className="flex items-center justify-between min-w-0">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-bold truncate">Payroll</h1>
-            <p className="text-[12px] text-muted-foreground truncate">Process monthly payroll</p>
-          </div>
-          <div className="kenya-gradient w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ml-2 shadow-lg">
-            <Calculator className="h-5 w-5 text-white" />
-          </div>
-        </div>
-      </div>
-
-      {/* Desktop Header */}
-      <div className={cn(
-        "hidden sm:block px-4 sm:px-6 py-6 border-b bg-card/80 backdrop-blur-sm transition-all duration-300",
-        shouldExpand ? "sm:px-4" : "sm:px-6"
-      )}>
-        <div className="flex items-center justify-between min-w-0">
-          <div className="min-w-0 flex-1">
-            <h1 className={cn(
-              "font-bold transition-all duration-300",
-              shouldExpand ? "text-xl" : "text-2xl"
-            )}>
-              Payroll Processing
-            </h1>
-            <p className={cn(
-              "text-muted-foreground transition-all duration-300 mt-1",
-              shouldExpand ? "text-xs" : "text-sm"
-            )}>
-              Calculate and process monthly payroll for your employees
-            </p>
-          </div>
-          <div className="kenya-gradient w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ml-4 shadow-lg">
-            <Calculator className="h-6 w-6 text-white" />
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
+      
       <div className={cn(
         "w-full min-w-0 space-y-6 transition-all duration-300",
-        "p-4 sm:p-6",
-        shouldExpand ? "sm:px-4" : "sm:px-6"
+        "p-4 sm:p-6"
       )}>
         {/* Configuration */}
         <Card className="overflow-hidden min-w-0 border-2">
