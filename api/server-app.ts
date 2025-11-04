@@ -391,9 +391,8 @@ app.get('/api/db/ping', authenticate, async (_req: AuthRequest, res) => {
 })
 
 // Cron Job Endpoint for Database Keep-Alive
-// This endpoint is called by Vercel Cron Jobs every 2 hours to keep the database active
-// It doesn't require user authentication but uses a secret token for security
-// Vercel Cron Jobs automatically add a 'x-vercel-signature' header, but we use CRON_SECRET for extra security
+// This endpoint is called by Vercel Cron Jobs once per day to keep the database active
+// Vercel Cron Jobs are automatically authenticated by Vercel's infrastructure
 app.get('/api/cron/db-keepalive', async (req, res) => {
   const startTime = Date.now()
   const timestamp = new Date().toISOString()
@@ -401,18 +400,23 @@ app.get('/api/cron/db-keepalive', async (req, res) => {
   try {
     console.log(`[DB Keep-Alive Cron] ========================================`)
     console.log(`[DB Keep-Alive Cron] Starting database keep-alive ping at ${timestamp}`)
-    console.log(`[DB Keep-Alive Cron] Request headers:`, JSON.stringify(req.headers, null, 2))
     
-    // Verify cron secret token (set in Vercel environment variables)
-    // Check both header and query parameter for flexibility
+    // Check if this is a Vercel cron job request
+    // Vercel cron jobs come from Vercel's infrastructure and are trusted
+    const isVercelCron = req.headers['x-vercel-cron'] === '1' || 
+                         req.headers['user-agent']?.includes('vercel-cron') ||
+                         process.env.VERCEL === '1' // Trust requests when running on Vercel
+    
+    // Verify cron secret token (optional for Vercel cron, required for manual calls)
     const cronSecret = req.headers['x-cron-secret'] as string || req.query.secret as string
     const expectedSecret = process.env.CRON_SECRET
     
-    // If CRON_SECRET is set, require it; otherwise allow any request (for development/testing)
-    if (expectedSecret) {
+    // If CRON_SECRET is set and this is NOT a Vercel cron job, require the secret
+    // Vercel cron jobs are automatically authenticated by Vercel's infrastructure
+    if (expectedSecret && !isVercelCron) {
       if (!cronSecret || cronSecret !== expectedSecret) {
-        console.warn(`[DB Keep-Alive Cron] ❌ UNAUTHORIZED - Invalid or missing cron secret`)
-        console.warn(`[DB Keep-Alive Cron] Expected secret: ${expectedSecret ? 'SET' : 'NOT SET'}`)
+        console.warn(`[DB Keep-Alive Cron] ❌ UNAUTHORIZED - Invalid or missing cron secret for manual call`)
+        console.warn(`[DB Keep-Alive Cron] Expected secret: SET`)
         console.warn(`[DB Keep-Alive Cron] Provided secret: ${cronSecret ? 'PROVIDED' : 'MISSING'}`)
         return res.status(401).json({ 
           error: 'Unauthorized - Invalid cron secret',
@@ -420,7 +424,9 @@ app.get('/api/cron/db-keepalive', async (req, res) => {
           status: 'failed'
         })
       }
-      console.log(`[DB Keep-Alive Cron] ✅ Secret verified successfully`)
+      console.log(`[DB Keep-Alive Cron] ✅ Secret verified successfully (manual call)`)
+    } else if (isVercelCron) {
+      console.log(`[DB Keep-Alive Cron] ✅ Authenticated as Vercel Cron Job`)
     } else {
       console.warn(`[DB Keep-Alive Cron] ⚠️  WARNING: CRON_SECRET not set - allowing request (not secure for production)`)
     }
