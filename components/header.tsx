@@ -65,7 +65,7 @@ export function Header() {
       "sticky top-0 z-40 w-full border-b-2 border-border/50 bg-card/80 backdrop-blur-xl",
       "transition-all duration-300 shadow-sm"
     )}>
-      <div className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4 md:px-6 gap-2">
+      <div className="relative flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4 md:px-6 gap-2">
         {/* Left side - Sidebar toggle, icon, and title */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
           {/* Sidebar Toggle Button */}
@@ -114,9 +114,9 @@ export function Header() {
           </div>
         </div>
         
-        {/* Right side - Theme Toggle and User Profile */}
+        {/* Right side - Theme Toggle and User Profile (desktop/tablet) */}
         {pathname !== '/login' && (
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+          <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             {/* Theme Toggle */}
             <div className="p-1 sm:p-1.5 rounded-lg border border-border/50 bg-card/50 hover:bg-card/80 transition-colors">
               <ThemeToggle />
@@ -188,6 +188,15 @@ export function Header() {
                 </PopoverContent>
               </Popover>
             )}
+          </div>
+        )}
+
+        {/* Mobile-only quick theme toggle (always visible) */}
+        {pathname !== '/login' && (
+          <div className="sm:hidden absolute right-3 top-1/2 -translate-y-1/2">
+            <div className="p-1 rounded-lg border border-border/50 bg-card/60 backdrop-blur hover:bg-card/80 transition-colors">
+              <ThemeToggle />
+            </div>
           </div>
         )}
       </div>
