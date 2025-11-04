@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/router'
+import { useNavigate } from 'react-router-dom'
 import { useNextEmployeeId } from '@/hooks/useNextEmployeeId'
 import { useSidebar } from '@/contexts/sidebar-context'
 import { useToast } from '@/hooks/use-toast'
@@ -154,73 +154,23 @@ function AllowanceField({
 }
 
 function EmployeeForm() {
-  const router = useRouter()
+  const navigate = useNavigate()
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const { data: nextEmployeeId } = useNextEmployeeId()
   const { data: employees } = useEmployees()
-  const employeeId = router.query.id as string | undefined
-  const isEditMode = !!employeeId
+  // Get employee ID from URL if editing (this page handles both new and edit)
+  const employeeId = undefined // This page only handles new employees, edit is handled elsewhere
+  const isEditMode = false
   const [formData, setFormData] = useState<EmployeeFormData>(initialFormData)
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(isEditMode)
   const [errors, setErrors] = useState<Partial<Record<keyof EmployeeFormData, string>>>({})
 
-  // Load employee data when editing
+  // Load employee data when editing (not used in this page, edit is handled elsewhere)
   useEffect(() => {
-    if (isEditMode && employeeId && employees && router.isReady) {
-      const employee = employees.find((e: any) => e.id === employeeId)
-      if (employee) {
-        setFormData({
-          name: employee.name || '',
-          kra_pin: employee.kra_pin || '',
-          position: employee.position || '',
-          department: (employee as any).department || '',
-          email: (employee as any).email || '',
-          phone: (employee as any).phone || '',
-          address: (employee as any).address || '',
-          date_of_birth: (employee as any).date_of_birth || '',
-          date_of_employment: (employee as any).date_of_employment || '',
-          employment_type: (employee as any).employment_type || 'full-time',
-          bank_name: (employee as any).bank_name || '',
-          bank_account_number: (employee as any).bank_account_number || '',
-          bank_branch: (employee as any).bank_branch || '',
-          basic_salary: employee.basic_salary || 0,
-          allowances: {
-            housing: (employee.allowances as any)?.housing || 0,
-            transport: (employee.allowances as any)?.transport || 0,
-            medical: (employee.allowances as any)?.medical || 0,
-            communication: (employee.allowances as any)?.communication || 0,
-            meals: (employee.allowances as any)?.meals || 0,
-            fuel: (employee.allowances as any)?.fuel || 0,
-            entertainment: (employee.allowances as any)?.entertainment || 0,
-          },
-          helb_amount: employee.helb_amount || 0,
-          voluntary_deductions: {
-            insurance: (employee.voluntary_deductions as any)?.insurance || 0,
-            pension: (employee.voluntary_deductions as any)?.pension || 0,
-            union_fees: (employee.voluntary_deductions as any)?.union_fees || 0,
-            loans: (employee.voluntary_deductions as any)?.loans || 0,
-            saccos: (employee.voluntary_deductions as any)?.saccos || 0,
-            welfare: (employee.voluntary_deductions as any)?.welfare || 0,
-          },
-          emergency_contact_name: (employee as any).emergency_contact_name || '',
-          emergency_contact_phone: (employee as any).emergency_contact_phone || '',
-          emergency_contact_relationship: (employee as any).emergency_contact_relationship || '',
-        })
-        setIsLoading(false)
-      } else {
-        toast({
-          title: 'Employee not found',
-          description: 'The employee you are trying to edit does not exist.',
-          variant: 'destructive',
-        })
-        router.push('/employees')
-      }
-    } else if (!isEditMode) {
-      setIsLoading(false)
-    }
-  }, [isEditMode, employeeId, employees, router.isReady, router, toast])
+    setIsLoading(false)
+  }, [])
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof EmployeeFormData, string>> = {}
@@ -395,7 +345,7 @@ function EmployeeForm() {
       // The refetch will happen in background to ensure data consistency
       // Use a small delay to ensure cache update is processed
       setTimeout(() => {
-        router.replace('/employees')
+        navigate('/employees', { replace: true })
       }, 50)
     } catch (error: any) {
       console.error('Error saving employee:', error)
@@ -905,7 +855,7 @@ function EmployeeForm() {
       <div className="flex flex-col sm:flex-row gap-4 justify-end">
         <Button 
           variant="outline" 
-          onClick={() => router.push('/employees')}
+          onClick={() => navigate('/employees')}
           className="flex items-center gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -925,7 +875,6 @@ function EmployeeForm() {
 }
 
 export default function AddEmployeePage() {
-  const router = useRouter()
   const { shouldExpand } = useSidebar()
 
   return (

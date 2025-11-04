@@ -39,6 +39,7 @@ type PayslipShape = {
   id: string
   employee_id: string
   employee_name: string
+  kra_pin?: string
   month: string
   gross_salary: number
   basic_salary: number
@@ -464,6 +465,7 @@ export default function PayslipsPage() {
       id: p.id,
       employee_id: p.employee_id || '',
       employee_name: p.employee_name || '',
+      kra_pin: p.kra_pin || undefined,
       month: p.month || '',
       gross_salary: Number(p.gross_salary) || 0,
       basic_salary: Number(p.basic_salary) || 0,

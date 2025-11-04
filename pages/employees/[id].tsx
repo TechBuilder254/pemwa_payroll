@@ -1,4 +1,4 @@
-import { useRouter } from 'next/router'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useMemo, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,8 +8,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { calculatePayroll, formatCurrency } from '@/lib/payroll-calculations'
 
 export default function EmployeeDetails() {
-  const router = useRouter()
-  const { id } = router.query as { id: string }
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { data: employees, refetch: refetchEmployees } = useEmployees()
   const { data: settings } = usePayrollSettings()
@@ -17,11 +17,11 @@ export default function EmployeeDetails() {
 
   // Refetch employees when this page is visited to ensure we have the latest data
   useEffect(() => {
-    if (id && router.isReady) {
+    if (id) {
       // Refetch employees to get the latest data, especially after edits
       refetchEmployees()
     }
-  }, [id, router.isReady, refetchEmployees])
+  }, [id, refetchEmployees])
 
   if (!employee || !settings) {
     return (
@@ -32,7 +32,7 @@ export default function EmployeeDetails() {
             <CardDescription>{!employee ? 'Not found' : 'Loading settings…'}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => router.push('/employees')}>Back to Employees</Button>
+            <Button onClick={() => navigate('/employees')}>Back to Employees</Button>
           </CardContent>
         </Card>
       </div>
@@ -58,7 +58,7 @@ export default function EmployeeDetails() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>{employee.name}</span>
-              <Button variant="outline" onClick={() => router.push('/employees')}>Back to Employees</Button>
+              <Button variant="outline" onClick={() => navigate('/employees')}>Back to Employees</Button>
             </CardTitle>
             <CardDescription>{employee.position} • {employee.employee_id}</CardDescription>
           </CardHeader>
