@@ -337,27 +337,24 @@ const Employees: React.FC = () => {
         className: 'bg-green-600 text-white border-green-700'
       })
       
-      // Don't invalidate immediately - keep the optimistic update visible
-      // Only refetch after a delay to sync with server, ensuring server has processed deletion
+      // Keep the optimistic update - don't refetch employees list
+      // The employee is already removed from cache and will stay removed
+      // Only update dashboard stats since employee count changed
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      
+      // Refetch dashboard stats to update counts
       setTimeout(() => {
-        // Update cache with fresh data from server
-        queryClient.invalidateQueries({ queryKey: ['employees'] })
-        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-        
-        // Refetch to sync with server
-        queryClient.refetchQueries({ 
-          queryKey: ['employees'],
-          type: 'active',
-        }).catch(() => {
-          // Silently fail if component unmounted or query inactive
-        })
         queryClient.refetchQueries({ 
           queryKey: ['dashboard-stats'],
           type: 'active',
         }).catch(() => {
           // Silently fail if component unmounted or query inactive
         })
-      }, 1500)
+      }, 300)
+      
+      // DO NOT refetch employees list - the optimistic update is the source of truth
+      // The employee will reappear only if the server delete actually failed
+      // In that case, the error handler will restore the employee
       
     } catch (err: any) {
       // Rollback on error - restore the employee to the list
