@@ -16,7 +16,8 @@ import {
   Building2,
   Calculator,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Trash2
 } from 'lucide-react'
 import { formatCurrency, calculatePayroll } from '@/lib/payroll-calculations'
 import { useEmployees } from '@/hooks/useEmployees'
@@ -26,7 +27,17 @@ import { useToast } from '@/hooks/use-toast'
 import { deleteEmployee } from '@/lib/api'
 import EmployeeTable from '@/components/employees/EmployeeTable'
 
-function EmployeeCard({ employee, settings }: { employee: any; settings: any }) {
+function EmployeeCard({ 
+  employee, 
+  settings, 
+  onEdit, 
+  onDelete 
+}: { 
+  employee: any
+  settings: any
+  onEdit: (employee: any) => void
+  onDelete: (employee: any) => void
+}) {
   const { shouldExpand } = useSidebar()
   const [showCalculations, setShowCalculations] = useState(false)
 
@@ -196,13 +207,23 @@ function EmployeeCard({ employee, settings }: { employee: any; settings: any }) 
           )}
 
           <div className="flex gap-2 pt-2">
-            <Button size="sm" variant="outline" className="flex-1">
-              <Eye className="h-4 w-4 mr-1" />
-              View
-            </Button>
-            <Button size="sm" variant="outline" className="flex-1">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="flex-1"
+              onClick={() => onEdit(employee)}
+            >
               <Edit className="h-4 w-4 mr-1" />
               Edit
+            </Button>
+            <Button 
+              size="sm" 
+              variant="destructive" 
+              className="flex-1"
+              onClick={() => onDelete(employee)}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
             </Button>
           </div>
         </div>
@@ -317,7 +338,28 @@ const Employees: React.FC = () => {
             <EmployeesSkeleton />
           ) : (
             filteredEmployees.map((employee) => (
-              <EmployeeCard key={employee.id} employee={employee} settings={settings} />
+              <EmployeeCard 
+                key={employee.id} 
+                employee={employee} 
+                settings={settings}
+                onEdit={(e) => navigate(`/employees/${e.id}`)}
+                onDelete={async (e) => {
+                  if (!confirm(`Delete ${e.name} (${e.employee_id})? This cannot be undone.`)) return
+                  try {
+                    await deleteEmployee(e.id)
+                    toast({ title: 'Employee deleted', description: `${e.name} removed.` })
+                    // Invalidate and refetch to update the list immediately
+                    queryClient.invalidateQueries({ queryKey: ['employees'] })
+                    queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+                    await Promise.all([
+                      queryClient.refetchQueries({ queryKey: ['employees'] }),
+                      queryClient.refetchQueries({ queryKey: ['dashboard-stats'] }),
+                    ])
+                  } catch (err: any) {
+                    toast({ title: 'Delete failed', description: err?.message || 'Could not delete employee', variant: 'destructive' })
+                  }
+                }}
+              />
             ))
           )}
         </div>
