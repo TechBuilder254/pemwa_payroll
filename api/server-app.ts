@@ -493,6 +493,15 @@ app.get('/api/cron/db-keepalive', async (req, res) => {
   }
 })
 
+// Health check endpoint - simple test to verify API is working
+app.get('/api/health', async (_req, res) => {
+  res.status(200).json({ 
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    service: 'pemwa-payroll-api'
+  })
+})
+
 // Test endpoint to manually verify the keep-alive system
 // Call this endpoint to test if the cron job is configured correctly
 app.get('/api/cron/test', async (req, res) => {
