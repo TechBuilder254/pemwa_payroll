@@ -514,14 +514,14 @@ app.get('/api/cron/test', async (req, res) => {
       cronSecretConfigured: !!expectedSecret,
       cronSecretProvided: !!cronSecret,
       cronSecretValid: expectedSecret ? cronSecret === expectedSecret : null,
-      cronSchedule: 'Every 2 hours (0 */2 * * *)',
+      cronSchedule: 'Once per day at 12:00 UTC (0 12 * * *) - Hobby plan compatible',
       cronPath: '/api/cron/db-keepalive',
       vercelCronEnabled: true,
       instructions: {
         step1: 'Check Vercel Dashboard → Your Project → Cron Jobs to see execution history',
         step2: 'Check Vercel Dashboard → Your Project → Functions → Logs to see detailed logs',
         step3: 'Add CRON_SECRET environment variable in Vercel if not already set',
-        step4: 'The cron job runs automatically every 2 hours after deployment'
+        step4: 'The cron job runs automatically once per day (12:00 UTC) after deployment'
       }
     }
     

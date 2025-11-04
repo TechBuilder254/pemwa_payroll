@@ -9,7 +9,7 @@
 3. Click on **Cron Jobs** in the left sidebar
 4. You should see:
    - **Job Name**: `/api/cron/db-keepalive`
-   - **Schedule**: `0 */2 * * *` (Every 2 hours)
+   - **Schedule**: `0 12 * * *` (Once per day at 12:00 UTC - Hobby plan compatible)
    - **Status**: Active
    - **Last Run**: Shows the timestamp of the last execution
    - **Next Run**: Shows when it will run next
@@ -112,14 +112,16 @@ When the cron job runs successfully, you should see logs like:
 
 ### 7. **Cron Schedule Explanation**
 
-The schedule `0 */2 * * *` means:
+The schedule `0 12 * * *` means:
 - `0` - At minute 0 (top of the hour)
-- `*/2` - Every 2 hours
+- `12` - At hour 12 (noon UTC)
 - `*` - Every day of month
 - `*` - Every month
 - `*` - Every day of week
 
-So it runs at: 00:00, 02:00, 04:00, 06:00, 08:00, 10:00, 12:00, 14:00, 16:00, 18:00, 20:00, 22:00
+So it runs once per day at 12:00 UTC (noon UTC).
+
+**Note**: Vercel Hobby plan limits cron jobs to once per day. This schedule ensures the database gets pinged daily to prevent it from going to sleep. If you need more frequent pings, consider upgrading to the Pro plan.
 
 ### 8. **Monitoring Best Practices**
 
@@ -136,7 +138,7 @@ So it runs at: 00:00, 02:00, 04:00, 06:00, 08:00, 10:00, 12:00, 14:00, 16:00, 18
 - [ ] `vercel.json` contains the `crons` configuration
 - [ ] Latest code is deployed to Vercel
 - [ ] Cron job appears in Vercel Dashboard → Cron Jobs
-- [ ] Logs show successful execution every 2 hours
+- [ ] Logs show successful execution once per day (at 12:00 UTC)
 - [ ] Test endpoint (`/api/cron/test`) returns success
 - [ ] Database stays active (no sleep mode)
 

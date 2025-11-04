@@ -93,7 +93,7 @@ NODE_ENV
 
 The system includes an automated cron job that pings the database every 2 hours to prevent Supabase from putting it to sleep. This runs automatically via Vercel Cron Jobs.
 
-**Cron Schedule**: Every 2 hours (`0 */2 * * *`)
+**Cron Schedule**: Once per day at 12:00 UTC (`0 12 * * *`) - Hobby plan compatible
 
 **Important**: 
 - The cron job requires the `CRON_SECRET` environment variable to be set
