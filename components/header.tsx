@@ -37,7 +37,7 @@ export function Header() {
   const [isLoggingOut, setIsLoggingOut] = React.useState(false)
   const [profileOpen, setProfileOpen] = React.useState(false)
   
-  const config = pageConfig[pathname] || { title: "Pemwa Payroll", icon: BarChart3 }
+  const config = pageConfig[pathname] || { title: "PEMWA AGENCY LIMITED", icon: BarChart3 }
   const Icon = config.icon
 
   const handleLogout = async () => {

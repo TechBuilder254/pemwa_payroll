@@ -22,6 +22,7 @@ import { motion } from 'framer-motion'
 import { formatCurrency } from '@/lib/payroll-calculations'
 import { Link } from 'react-router-dom'
 import { useDashboardStats } from '@/hooks/useDashboardStats'
+import { useEffect } from 'react'
 
 function StatCard({ 
   title, 
@@ -252,7 +253,12 @@ function QuickActions() {
 
 export default function Dashboard() {
   const { shouldExpand } = useSidebar()
-  const { data: stats, isLoading } = useDashboardStats()
+  const { data: stats, isLoading, refetch: refetchStats } = useDashboardStats()
+  
+  // Refetch dashboard stats when component mounts to ensure fresh data
+  useEffect(() => {
+    refetchStats()
+  }, [refetchStats])
 
   // Calculate stats with fallback to 0 if no data
   const totalEmployees = stats?.totalEmployees || 0

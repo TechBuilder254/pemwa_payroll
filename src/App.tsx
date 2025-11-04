@@ -16,6 +16,7 @@ import P9 from '@/src/routes/P9'
 import Login from '@/src/routes/Login'
 import EmployeeDetails from '@/src/routes/EmployeeDetails'
 import { ScrollToTop } from '@/src/components/ScrollToTop'
+import { InactivityTimeout } from '@/components/InactivityTimeout'
 
 import { useSidebar } from '@/contexts/sidebar-context'
 import { useAuth } from '@/contexts/auth-context'
@@ -94,6 +95,7 @@ const App: React.FC = () => {
           </Routes>
         </main>
         <Toaster />
+        <InactivityTimeout />
       </div>
     </ThemeProvider>
   )

@@ -695,14 +695,18 @@ app.get('/api/dashboard/stats', async (req, res) => {
       status: 'completed'
     }))
 
-    // Calculate current month stats from employees if no payroll records
-    let monthlyPayroll = parseFloat(stats?.monthly_payroll) || 0
-    let totalDeductions = parseFloat(stats?.total_deductions) || 0
-    let netPayroll = parseFloat(stats?.net_payroll) || 0
-    let employerCost = parseFloat(stats?.employer_cost) || 0
+    // Always calculate current month stats from fresh employee data to reflect latest salary updates
+    // Only use payroll records for past months (not current month)
+    const isCurrentMonth = latestMonth === currentMonth
+    let monthlyPayroll = 0
+    let totalDeductions = 0
+    let netPayroll = 0
+    let employerCost = 0
 
-    // If no payroll records, calculate from employees and settings
-    if (monthlyPayroll === 0 && totalEmployees > 0) {
+    // For current month, always calculate from fresh employee data
+    // For past months, use saved payroll records
+    if (isCurrentMonth && totalEmployees > 0) {
+      // Always calculate from fresh employee data for current month to reflect latest salary updates
       // Get active payroll settings
       const { rows: settingsResult } = await query(
         `select personal_relief::float8 as personal_relief, nssf_employee_rate::float8 as nssf_employee_rate, 
@@ -817,6 +821,12 @@ app.get('/api/dashboard/stats', async (req, res) => {
         
         monthlyPayroll = grossTotal
       }
+    } else if (!isCurrentMonth && parseFloat(stats?.monthly_payroll) > 0) {
+      // For past months, use saved payroll records
+      monthlyPayroll = parseFloat(stats?.monthly_payroll) || 0
+      totalDeductions = parseFloat(stats?.total_deductions) || 0
+      netPayroll = parseFloat(stats?.net_payroll) || 0
+      employerCost = parseFloat(stats?.employer_cost) || 0
     }
 
     res.status(200).json({

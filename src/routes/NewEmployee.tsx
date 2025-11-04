@@ -123,9 +123,11 @@ function EmployeeForm() {
     if (!validateForm()) return
     setIsSaving(true)
     try {
+      let savedEmployee: any
+      
       if (isEditMode && employeeId) {
         // Update existing employee
-        await updateEmployee(employeeId, {
+        savedEmployee = await updateEmployee(employeeId, {
           name: formData.name,
           kra_pin: formData.kra_pin,
           position: formData.position,
@@ -135,6 +137,18 @@ function EmployeeForm() {
           voluntary_deductions: formData.voluntary_deductions as any,
         } as any)
         
+        // Immediately update the query cache with the updated employee data (instant UI update)
+        queryClient.setQueryData(['employees'], (oldEmployees: any[] | undefined) => {
+          if (!oldEmployees) return [savedEmployee]
+          const existingIndex = oldEmployees.findIndex((e: any) => e.id === savedEmployee.id)
+          if (existingIndex >= 0) {
+            const updated = [...oldEmployees]
+            updated[existingIndex] = savedEmployee
+            return updated
+          }
+          return [...oldEmployees, savedEmployee]
+        })
+        
         toast({ 
           title: 'Success!', 
           description: 'Employee has been updated successfully.', 
@@ -142,7 +156,7 @@ function EmployeeForm() {
         })
       } else {
         // Create new employee
-        await createEmployee({
+        savedEmployee = await createEmployee({
           name: formData.name,
           kra_pin: formData.kra_pin,
           position: formData.position,
@@ -151,6 +165,12 @@ function EmployeeForm() {
           helb_amount: formData.helb_amount,
           voluntary_deductions: formData.voluntary_deductions as any,
         } as any)
+
+        // Immediately update the query cache with the new employee data (instant UI update)
+        queryClient.setQueryData(['employees'], (oldEmployees: any[] | undefined) => {
+          if (!oldEmployees) return [savedEmployee]
+          return [...oldEmployees, savedEmployee]
+        })
         
         // Invalidate next employee ID only for new employees
         queryClient.invalidateQueries({ queryKey: ['next-employee-id'] })
@@ -162,17 +182,14 @@ function EmployeeForm() {
         })
       }
       
-      // Invalidate queries first
+      // Invalidate queries in background (don't wait) - cache already updated above for instant UI
       queryClient.invalidateQueries({ queryKey: ['employees'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      // Refetch in background without blocking
+      queryClient.refetchQueries({ queryKey: ['employees'] }).catch(() => {})
+      queryClient.refetchQueries({ queryKey: ['dashboard-stats'] }).catch(() => {})
       
-      // Wait for refetch to complete before navigating
-      await Promise.all([
-        queryClient.refetchQueries({ queryKey: ['employees'] }),
-        queryClient.refetchQueries({ queryKey: ['dashboard-stats'] }),
-      ])
-      
-      // Navigate immediately after refetch completes - list will be updated
+      // Navigate immediately - UI already updated via setQueryData above
       navigate('/employees')
     } catch (error: any) {
       toast({ 

@@ -37,7 +37,6 @@
     "node_modules",
     "pages/_app.tsx",
     "pages/api/**/*",
-    "pages/employees/**/*",
     "vite.config.ts"
   ]
 }

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useSidebar } from "@/contexts/sidebar-context"
 import { useAuth } from "@/contexts/auth-context"
+import { Logo } from "@/components/logo"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: BarChart3 },
@@ -48,12 +49,10 @@ export function Navigation() {
       <nav className="sm:hidden fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-xl border-b-2 border-border/50 shadow-lg">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center space-x-3">
-            <div className="kenya-gradient w-10 h-10 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-base">P</span>
-            </div>
+            <Logo variant="icon" size="md" />
             <div>
-              <span className="font-bold text-base text-slate-900 dark:text-foreground">Pemwa Payroll</span>
-              <p className="text-[10px] text-slate-600 dark:text-muted-foreground">Kenyan Payroll</p>
+              <span className="font-bold text-xs text-[#1e3a8a] dark:text-blue-400 uppercase">PEMWA AGENCY</span>
+              <p className="text-[10px] font-medium text-[#84cc16] dark:text-green-400 uppercase">PAYROLL</p>
             </div>
           </div>
           <Button
@@ -97,12 +96,10 @@ export function Navigation() {
                   {/* Header */}
                   <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/50 bg-gradient-to-r from-primary/5 to-primary/10 flex-shrink-0">
                     <div className="flex items-center space-x-2">
-                      <div className="kenya-gradient w-9 h-9 rounded-xl flex items-center justify-center shadow-lg">
-                        <span className="text-white font-bold text-sm">P</span>
-                      </div>
+                      <Logo variant="icon" size="md" />
                       <div>
-                        <span className="font-bold text-sm text-slate-900 dark:text-foreground">Pemwa Payroll</span>
-                        <p className="text-[9px] text-slate-600 dark:text-muted-foreground">Kenyan Payroll</p>
+                        <span className="font-bold text-xs text-[#1e3a8a] dark:text-blue-400 uppercase">PEMWA AGENCY</span>
+                        <p className="text-[9px] font-medium text-[#84cc16] dark:text-green-400 uppercase">PAYROLL</p>
                       </div>
                     </div>
                     <Button
@@ -207,11 +204,11 @@ export function Navigation() {
             shouldExpand ? "px-3 py-4" : "px-2 py-3 justify-center"
           )}>
             <motion.div 
-              className="kenya-gradient w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg"
-              whileHover={prefersReducedMotion ? undefined : { scale: 1.05, rotate: 5 }}
+              className="flex-shrink-0"
+              whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
               whileTap={prefersReducedMotion ? undefined : { scale: 0.95 }}
             >
-              <span className="text-white font-bold text-xl">P</span>
+              <Logo variant={shouldExpand ? "compact" : "icon"} showText={false} size="md" />
             </motion.div>
             
             <AnimatePresence mode="wait">
@@ -229,11 +226,11 @@ export function Navigation() {
                       delay: 0.05
                     }}
                   >
-                    <h1 className="text-sm font-bold whitespace-nowrap text-slate-900 dark:text-foreground">
-                      Pemwa Payroll
+                    <h1 className="text-xs font-bold whitespace-nowrap text-[#1e3a8a] dark:text-blue-400 uppercase tracking-tight">
+                      PEMWA AGENCY
                     </h1>
-                    <p className="text-[10px] text-slate-600 dark:text-muted-foreground whitespace-nowrap font-medium">
-                      Kenyan Payroll System
+                    <p className="text-[10px] font-medium text-[#84cc16] dark:text-green-400 whitespace-nowrap uppercase tracking-wide">
+                      PAYROLL SYSTEM
                     </p>
                   </motion.div>
                   

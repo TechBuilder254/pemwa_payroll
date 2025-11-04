@@ -31,6 +31,7 @@ import { usePayslips } from '@/hooks/usePayslips'
 import { useEmployees } from '@/hooks/useEmployees'
 import { generatePayslipPDF } from '@/lib/exports/pdf'
 import { generatePayslipExcel } from '@/lib/exports/excel'
+import { Logo } from '@/components/logo'
 
 // Payslips are computed from employees + active settings for the selected month
 
@@ -251,11 +252,11 @@ function PayslipViewer({ payslip }: { payslip: PayslipShape }) {
     >
       <Card className="max-w-4xl mx-auto overflow-hidden min-w-0 w-full border-2 shadow-xl">
         <CardHeader className="text-center border-b-2 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
-          <div className="kenya-gradient w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <FileText className="h-10 w-10 text-white" />
+          <div className="flex justify-center mb-4">
+            <Logo variant="full" showText={true} size="xl" />
           </div>
-          <CardTitle className="text-3xl font-bold mb-2">PEMWA PAYROLL SYSTEM</CardTitle>
-          <CardDescription className="text-lg font-semibold">Monthly Payslip</CardDescription>
+          <CardTitle className="text-2xl font-bold mb-2 text-[#1e3a8a] dark:text-blue-400">Monthly Payslip</CardTitle>
+          <CardDescription className="text-base font-medium">PAYROLL SYSTEM</CardDescription>
           <div className="flex justify-between items-center mt-6 pt-4 border-t px-4 gap-4">
             <div className="text-left min-w-0 flex-1">
               <p className="font-bold text-lg truncate text-slate-900 dark:text-foreground">{payslip.employee_name}</p>

@@ -1,17 +1,27 @@
 import { useRouter } from 'next/router'
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useEmployees } from '@/hooks/useEmployees'
 import { usePayrollSettings } from '@/hooks/usePayrollSettings'
+import { useQueryClient } from '@tanstack/react-query'
 import { calculatePayroll, formatCurrency } from '@/lib/payroll-calculations'
 
 export default function EmployeeDetails() {
   const router = useRouter()
   const { id } = router.query as { id: string }
-  const { data: employees } = useEmployees()
+  const queryClient = useQueryClient()
+  const { data: employees, refetch: refetchEmployees } = useEmployees()
   const { data: settings } = usePayrollSettings()
   const employee = useMemo(() => (employees || []).find(e => e.id === id), [employees, id])
+
+  // Refetch employees when this page is visited to ensure we have the latest data
+  useEffect(() => {
+    if (id && router.isReady) {
+      // Refetch employees to get the latest data, especially after edits
+      refetchEmployees()
+    }
+  }, [id, router.isReady, refetchEmployees])
 
   if (!employee || !settings) {
     return (

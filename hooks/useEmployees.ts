@@ -6,9 +6,10 @@ export function useEmployees() {
   return useQuery<Employee[], Error>({
     queryKey: ['employees'],
     queryFn: fetchEmployees,
-    staleTime: 0, // Always refetch to ensure fresh data
-    refetchOnMount: true, // Refetch when component mounts
-    refetchOnWindowFocus: true, // Refetch when window regains focus
+    staleTime: 0, // Always consider data stale to allow refetching when invalidated
+    refetchOnMount: true, // Refetch when component mounts to ensure fresh data
+    refetchOnWindowFocus: false, // Don't refetch on window focus (prevents overwriting cache updates)
+    refetchOnReconnect: true, // Refetch when reconnecting to network
   })
 }
 

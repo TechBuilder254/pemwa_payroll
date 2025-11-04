@@ -35,6 +35,7 @@ import { generateP9PDF } from '@/lib/exports/pdf'
 import { generateP9Excel } from '@/lib/exports/excel'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useToast } from '@/hooks/use-toast'
+import { Logo } from '@/components/logo'
 
 // Data is computed from employees + settings (annualized from monthly)
 
@@ -339,11 +340,11 @@ function P9Viewer({ p9Form }: { p9Form: P9Shape }) {
     >
       <Card className="max-w-5xl mx-auto overflow-hidden border-2 shadow-xl">
         <CardHeader className="text-center border-b-2 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
-          <div className="kenya-gradient w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <FileText className="h-10 w-10 text-white" />
+          <div className="flex justify-center mb-4">
+            <Logo variant="full" showText={true} size="xl" />
           </div>
-          <CardTitle className="text-3xl font-bold mb-2">PEMWA PAYROLL SYSTEM</CardTitle>
-          <CardDescription className="text-lg font-semibold">P9 Form - Annual Tax Summary</CardDescription>
+          <CardTitle className="text-2xl font-bold mb-2 text-[#1e3a8a] dark:text-blue-400">P9 Form - Annual Tax Summary</CardTitle>
+          <CardDescription className="text-base font-medium">PAYROLL SYSTEM</CardDescription>
           <div className="flex justify-between items-center mt-6 pt-4 border-t px-4 gap-4">
             <div className="text-left space-y-1 min-w-0 flex-1">
               <p className="font-bold text-lg truncate">{p9Form.employee_name}</p>

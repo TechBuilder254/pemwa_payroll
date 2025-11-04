@@ -89,7 +89,8 @@ export const generatePayslipExcel = (data: PayslipData): void => {
   
   // Payslip data
   const payslipData: Array<(string | number)[]> = [
-    ['PEMWA PAYROLL SYSTEM'],
+    ['PEMWA AGENCY LIMITED'],
+    ['PAYROLL SYSTEM'],
     ['Monthly Payslip'],
     [''],
     ['Employee Information'],
@@ -144,7 +145,8 @@ export const generateRemittanceExcel = (data: RemittanceData): void => {
   
   // Summary sheet
   const summaryData: Array<(string | number)[]> = [
-    ['PEMWA PAYROLL SYSTEM'],
+    ['PEMWA AGENCY LIMITED'],
+    ['PAYROLL SYSTEM'],
     ['Government Remittance Summary'],
     [`Month: ${formatDate(data.month)}`],
     [''],
@@ -227,7 +229,8 @@ export const generateP9Excel = (data: P9Data): void => {
   const workbook = XLSX.utils.book_new()
   
   const p9Data: Array<(string | number)[]> = [
-    ['PEMWA PAYROLL SYSTEM'],
+    ['PEMWA AGENCY LIMITED'],
+    ['PAYROLL SYSTEM'],
     ['P9 Form - Annual Tax Summary'],
     [''],
     ['Employee Information'],

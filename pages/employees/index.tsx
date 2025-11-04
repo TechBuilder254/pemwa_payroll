@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
@@ -170,7 +170,27 @@ export default function Employees() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
-  const { data: employees, isLoading: isEmployeesLoading } = useEmployees()
+  const { data: employees, isLoading: isEmployeesLoading, refetch: refetchEmployees } = useEmployees()
+  
+  // Refetch employees when this page is visited or when route changes
+  // This ensures we always have the latest data when navigating to this page
+  useEffect(() => {
+    if (router.isReady) {
+      // Immediately refetch to get the latest data from server
+      refetchEmployees()
+    }
+  }, [router.pathname, router.isReady, refetchEmployees])
+  
+  // Also listen for query cache updates to force re-render when data changes
+  useEffect(() => {
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event?.query?.queryKey?.[0] === 'employees') {
+        // Force component to re-render with latest data
+        refetchEmployees()
+      }
+    })
+    return () => unsubscribe()
+  }, [queryClient, refetchEmployees])
 
   const filteredEmployees = useMemo(() => {
     const list = employees ?? []

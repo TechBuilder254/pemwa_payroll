@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { useSidebar } from '@/contexts/sidebar-context'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -277,9 +277,15 @@ export default function PayrollPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [comboboxKey, setComboboxKey] = useState(0) // Force reset combobox
   const [existingPayrolls, setExistingPayrolls] = useState<Set<string>>(new Set()) // Track employee IDs with existing payrolls
+  const calculationsRef = useRef<PayrollCalculation[]>([]) // Track calculations for recalculation logic
   const { data: employees, isLoading: isEmployeesLoading } = useEmployees()
   const { data: settings, isLoading: isSettingsLoading } = usePayrollSettings()
-  const { data: payslipsData } = usePayslips(undefined, selectedMonth) // Check existing payslips for selected month
+  const { data: payslipsData } = usePayslips(undefined, selectedMonth) // Check existing payrolls for selected month
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    calculationsRef.current = calculations
+  }, [calculations])
 
   const employeeOptions = (employees ?? []).map(emp => ({
     value: emp.id,
@@ -339,7 +345,7 @@ export default function PayrollPage() {
       return
     }
 
-    if (!settings) {
+    if (!settings || !employees) {
       toast({
         title: "Payroll Settings Required",
         description: "Please configure payroll settings before processing payroll",
@@ -353,8 +359,13 @@ export default function PayrollPage() {
     // Simulate processing delay
     setTimeout(() => {
       try {
+        // Always use fresh employee data from query cache
         const newCalculations = selectedEmployees.map(employeeId => {
-          const employee = (employees ?? []).find(emp => emp.id === employeeId)!
+          const employee = employees.find(emp => emp.id === employeeId)
+          if (!employee) {
+            throw new Error(`Employee with ID ${employeeId} not found`)
+          }
+          
           const calculation = calculatePayroll(
             { id: employee.id, basic_salary: employee.basic_salary, helb_amount: employee.helb_amount } as any,
             employee.allowances as any,
@@ -390,18 +401,71 @@ export default function PayrollPage() {
     }, 500)
   }
 
+  // Recalculate payroll when employee data changes (e.g., salary updated)
+  // This ensures calculations always use the latest employee salary/allowances
+  useEffect(() => {
+    const currentCalculations = calculationsRef.current
+    if (currentCalculations.length > 0 && employees && settings) {
+      // Check if any employees in calculations have been updated
+      const needsRecalculation = currentCalculations.some(calc => {
+        const freshEmployee = employees.find(emp => emp.id === calc.employee.id)
+        if (!freshEmployee) return false
+        
+        // Check if salary or allowances changed
+        return (
+          freshEmployee.basic_salary !== calc.employee.basic_salary ||
+          freshEmployee.helb_amount !== calc.employee.helb_amount ||
+          JSON.stringify(freshEmployee.allowances) !== JSON.stringify(calc.employee.allowances) ||
+          JSON.stringify(freshEmployee.voluntary_deductions) !== JSON.stringify(calc.employee.voluntary_deductions)
+        )
+      })
+
+      if (needsRecalculation) {
+        // Recalculate with fresh employee data
+        setCalculations(prevCalculations => {
+          return prevCalculations.map(calc => {
+            const freshEmployee = employees.find(emp => emp.id === calc.employee.id)
+            if (!freshEmployee) return calc
+
+            const newCalculation = calculatePayroll(
+              { id: freshEmployee.id, basic_salary: freshEmployee.basic_salary, helb_amount: freshEmployee.helb_amount } as any,
+              freshEmployee.allowances as any,
+              freshEmployee.voluntary_deductions as any,
+              calc.bonuses,
+              calc.overtime,
+              settings as any
+            )
+            
+            return {
+              employee: freshEmployee,
+              bonuses: calc.bonuses,
+              overtime: calc.overtime,
+              calculation: newCalculation
+            }
+          })
+        })
+      }
+    }
+  }, [employees, settings])
+
   const updateEmployeeCalculation = (employeeId: string, bonuses: number, overtime: number) => {
+    // Get fresh employee data from query cache to ensure we use the latest salary/allowances
+    const freshEmployee = (employees ?? []).find(emp => emp.id === employeeId)
+    
+    if (!freshEmployee || !settings) return
+    
     setCalculations(prev => prev.map(calc => {
       if (calc.employee.id === employeeId) {
+        // Use fresh employee data instead of stale calc.employee data
         const newCalculation = calculatePayroll(
-          { id: calc.employee.id, basic_salary: calc.employee.basic_salary, helb_amount: calc.employee.helb_amount } as any,
-          calc.employee.allowances as any,
-          calc.employee.voluntary_deductions as any,
+          { id: freshEmployee.id, basic_salary: freshEmployee.basic_salary, helb_amount: freshEmployee.helb_amount } as any,
+          freshEmployee.allowances as any,
+          freshEmployee.voluntary_deductions as any,
           bonuses,
           overtime,
           settings as any
         )
-        return { ...calc, bonuses, overtime, calculation: newCalculation }
+        return { ...calc, employee: freshEmployee, bonuses, overtime, calculation: newCalculation }
       }
       return calc
     }))

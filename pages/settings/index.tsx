@@ -262,6 +262,9 @@ function SettingsForm({ initial }: { initial: PayrollSettings }) {
         effective_to: settings.effective_to,
       })
       
+      // Update query cache immediately with the saved data (ensures UI reflects changes instantly)
+      queryClient.setQueryData(['payroll-settings'], updatedSettings)
+      
       // Update local state with saved data immediately (reflects what's in database)
       setSettings(updatedSettings)
       

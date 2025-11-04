@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useNextEmployeeId } from '@/hooks/useNextEmployeeId'
 import { useSidebar } from '@/contexts/sidebar-context'
 import { useToast } from '@/hooks/use-toast'
 import { useQueryClient } from '@tanstack/react-query'
+import { useEmployees } from '@/hooks/useEmployees'
+import { fetchEmployees } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -156,10 +158,69 @@ function EmployeeForm() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const { data: nextEmployeeId } = useNextEmployeeId()
+  const { data: employees } = useEmployees()
+  const employeeId = router.query.id as string | undefined
+  const isEditMode = !!employeeId
   const [formData, setFormData] = useState<EmployeeFormData>(initialFormData)
   const [isSaving, setIsSaving] = useState(false)
+  const [isLoading, setIsLoading] = useState(isEditMode)
   const [errors, setErrors] = useState<Partial<Record<keyof EmployeeFormData, string>>>({})
 
+  // Load employee data when editing
+  useEffect(() => {
+    if (isEditMode && employeeId && employees && router.isReady) {
+      const employee = employees.find((e: any) => e.id === employeeId)
+      if (employee) {
+        setFormData({
+          name: employee.name || '',
+          kra_pin: employee.kra_pin || '',
+          position: employee.position || '',
+          department: (employee as any).department || '',
+          email: (employee as any).email || '',
+          phone: (employee as any).phone || '',
+          address: (employee as any).address || '',
+          date_of_birth: (employee as any).date_of_birth || '',
+          date_of_employment: (employee as any).date_of_employment || '',
+          employment_type: (employee as any).employment_type || 'full-time',
+          bank_name: (employee as any).bank_name || '',
+          bank_account_number: (employee as any).bank_account_number || '',
+          bank_branch: (employee as any).bank_branch || '',
+          basic_salary: employee.basic_salary || 0,
+          allowances: {
+            housing: (employee.allowances as any)?.housing || 0,
+            transport: (employee.allowances as any)?.transport || 0,
+            medical: (employee.allowances as any)?.medical || 0,
+            communication: (employee.allowances as any)?.communication || 0,
+            meals: (employee.allowances as any)?.meals || 0,
+            fuel: (employee.allowances as any)?.fuel || 0,
+            entertainment: (employee.allowances as any)?.entertainment || 0,
+          },
+          helb_amount: employee.helb_amount || 0,
+          voluntary_deductions: {
+            insurance: (employee.voluntary_deductions as any)?.insurance || 0,
+            pension: (employee.voluntary_deductions as any)?.pension || 0,
+            union_fees: (employee.voluntary_deductions as any)?.union_fees || 0,
+            loans: (employee.voluntary_deductions as any)?.loans || 0,
+            saccos: (employee.voluntary_deductions as any)?.saccos || 0,
+            welfare: (employee.voluntary_deductions as any)?.welfare || 0,
+          },
+          emergency_contact_name: (employee as any).emergency_contact_name || '',
+          emergency_contact_phone: (employee as any).emergency_contact_phone || '',
+          emergency_contact_relationship: (employee as any).emergency_contact_relationship || '',
+        })
+        setIsLoading(false)
+      } else {
+        toast({
+          title: 'Employee not found',
+          description: 'The employee you are trying to edit does not exist.',
+          variant: 'destructive',
+        })
+        router.push('/employees')
+      }
+    } else if (!isEditMode) {
+      setIsLoading(false)
+    }
+  }, [isEditMode, employeeId, employees, router.isReady, router, toast])
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof EmployeeFormData, string>> = {}
@@ -201,8 +262,12 @@ function EmployeeForm() {
     
     setIsSaving(true)
     try {
-      const res = await fetch('/api/employees', {
-        method: 'POST',
+      // Use the employeeId from state (already determined above)
+      const url = isEditMode && employeeId ? `/api/employees/${employeeId}` : '/api/employees'
+      const method = isEditMode && employeeId ? 'PUT' : 'POST'
+      
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formData.name,
@@ -228,17 +293,88 @@ function EmployeeForm() {
         }),
       })
       
+      const responseData = await res.json()
+      
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data?.error || 'Failed to save employee')
+        throw new Error(responseData?.error || 'Failed to save employee')
       }
       
-      // Invalidate and refetch employees query immediately
-      await queryClient.invalidateQueries({ queryKey: ['employees'] })
-      await queryClient.refetchQueries({ queryKey: ['employees'], type: 'active' })
-      // Also invalidate dashboard stats since employee count changed
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-      await queryClient.refetchQueries({ queryKey: ['dashboard-stats'], type: 'active' })
+      const savedEmployee = responseData.data
+      
+      console.log('[Employee Save] Saved employee data:', savedEmployee)
+      console.log('[Employee Save] Employee ID:', savedEmployee?.id)
+      console.log('[Employee Save] Basic Salary:', savedEmployee?.basic_salary)
+      
+      // Immediately update the query cache with the saved employee data (instant UI update)
+      // This MUST happen before any navigation or refetch to ensure UI updates immediately
+      queryClient.setQueryData(['employees'], (oldEmployees: any[] | undefined) => {
+        if (!oldEmployees) {
+          console.log('[Employee Save] No old employees, returning new array')
+          return [savedEmployee]
+        }
+        
+        // Check if employee already exists (for updates) - try multiple ID matching strategies
+        let existingIndex = oldEmployees.findIndex((e: any) => e.id === savedEmployee.id)
+        
+        // If not found by ID, try matching by employee_id
+        if (existingIndex === -1 && savedEmployee.employee_id) {
+          existingIndex = oldEmployees.findIndex((e: any) => e.employee_id === savedEmployee.employee_id)
+        }
+        
+        console.log('[Employee Save] Existing index:', existingIndex, 'Employee ID:', savedEmployee.id, 'Employee ID (string):', savedEmployee.employee_id)
+        console.log('[Employee Save] Old employees IDs:', oldEmployees.map((e: any) => ({ id: e.id, employee_id: e.employee_id })))
+        
+        if (existingIndex >= 0) {
+          // Update existing employee - replace with complete saved data
+          const updated = [...oldEmployees]
+          updated[existingIndex] = { ...savedEmployee } // Create new object to ensure React detects change
+          console.log('[Employee Save] Updated employee in cache:', updated[existingIndex])
+          console.log('[Employee Save] Updated basic_salary:', updated[existingIndex].basic_salary)
+          return updated
+        }
+        // Add new employee
+        console.log('[Employee Save] Adding new employee to cache')
+        return [...oldEmployees, savedEmployee]
+      })
+      
+      // Verify the cache update worked and force React Query to notify subscribers
+      const verifyCache = queryClient.getQueryData(['employees']) as any[] | undefined
+      if (verifyCache) {
+        const foundEmployee = verifyCache.find((e: any) => e.id === savedEmployee.id || e.employee_id === savedEmployee.employee_id)
+        console.log('[Employee Save] Cache verification - Found employee:', foundEmployee?.id, 'Salary:', foundEmployee?.basic_salary)
+        
+        // Force React Query to notify all subscribers of the cache change
+        // This ensures components using useEmployees() see the update immediately
+        queryClient.setQueryData(['employees'], verifyCache)
+      }
+      
+      // Also update dashboard stats cache immediately if we have the data
+      const updatedEmployees = queryClient.getQueryData(['employees']) as any[] | undefined
+      if (updatedEmployees) {
+        const totalEmployees = updatedEmployees.length
+        let monthlyPayroll = 0
+        updatedEmployees.forEach((emp: any) => {
+          const allowances = Object.values(emp.allowances || {}).reduce((sum: number, val: any) => sum + (val || 0), 0)
+          monthlyPayroll += (emp.basic_salary || 0) + allowances
+        })
+        queryClient.setQueryData(['dashboard-stats'], (oldStats: any) => ({
+          ...oldStats,
+          totalEmployees,
+          monthlyPayroll,
+        }))
+      }
+      
+      // Immediately update cache with saved employee data for instant UI update
+      queryClient.setQueryData(['employees'], (oldEmployees: any[] | undefined) => {
+        if (!oldEmployees) return [savedEmployee]
+        const existingIndex = oldEmployees.findIndex((e: any) => e.id === savedEmployee.id || e.employee_id === savedEmployee.employee_id)
+        if (existingIndex >= 0) {
+          const updated = [...oldEmployees]
+          updated[existingIndex] = { ...savedEmployee }
+          return updated
+        }
+        return [...oldEmployees, savedEmployee]
+      })
       
       toast({
         title: 'Success!',
@@ -246,10 +382,21 @@ function EmployeeForm() {
         className: 'bg-green-600 text-white border-green-700',
       })
       
-      // Wait a bit before redirecting to show the success toast
+      // Invalidate and refetch to ensure all components get fresh data from server
+      // This ensures data consistency across all pages
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      queryClient.refetchQueries({ queryKey: ['employees'], type: 'active' }).catch(() => {})
+      
+      // Also update dashboard stats
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] }).catch(() => {})
+      queryClient.refetchQueries({ queryKey: ['dashboard-stats'], type: 'active' }).catch(() => {})
+      
+      // Navigate immediately - cache is already updated above for instant display
+      // The refetch will happen in background to ensure data consistency
+      // Use a small delay to ensure cache update is processed
       setTimeout(() => {
-        router.push('/employees')
-      }, 500)
+        router.replace('/employees')
+      }, 50)
     } catch (error: any) {
       console.error('Error saving employee:', error)
       toast({
@@ -265,6 +412,22 @@ function EmployeeForm() {
   const totalAllowances = Object.values(formData.allowances).reduce((sum, amount) => sum + amount, 0)
   const totalVoluntaryDeductions = Object.values(formData.voluntary_deductions).reduce((sum, amount) => sum + amount, 0)
   const grossSalary = formData.basic_salary + totalAllowances
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 w-full overflow-x-hidden">
+        <div className={cn("w-full min-w-0 space-y-6 transition-all duration-300 p-4 sm:p-6")}>
+          <Card className="border-2">
+            <CardContent className="pt-6">
+              <div className="text-center py-8">
+                <div className="text-muted-foreground">Loading employee data...</div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 w-full min-w-0">
