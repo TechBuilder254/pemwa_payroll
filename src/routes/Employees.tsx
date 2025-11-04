@@ -449,7 +449,7 @@ const Employees: React.FC = () => {
           <EmployeeTable 
             employees={filteredEmployees as any}
             onView={(e: any) => navigate(`/employees/${e.id}`)}
-            onEdit={(e: any) => navigate(`/employees/${e.id}`)}
+            onEdit={(e: any) => navigate(`/employees/${e.id}/edit`)}
             onDelete={handleDeleteClick}
           />
         )}
