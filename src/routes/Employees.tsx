@@ -438,7 +438,7 @@ const Employees: React.FC = () => {
                 key={employee.id} 
                 employee={employee} 
                 settings={settings}
-                onEdit={(e) => navigate(`/employees/${e.id}`)}
+                onEdit={(e) => navigate(`/employees/${e.id}/edit`)}
                 onDelete={handleDeleteClick}
               />
             ))

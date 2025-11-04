@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNextEmployeeId } from '@/hooks/useNextEmployeeId'
 import { useSidebar } from '@/contexts/sidebar-context'
@@ -12,7 +12,8 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { User, Save, ArrowLeft, Mail, Phone, MapPin, Calendar, CreditCard, Building2, Calculator, ChevronDown, ChevronUp } from 'lucide-react'
 import { formatCurrency } from '@/lib/payroll-calculations'
-import { createEmployee } from '@/lib/api'
+import { createEmployee, updateEmployee, fetchEmployee } from '@/lib/api'
+import type { Employee } from '@/lib/supabase'
 
 interface EmployeeFormData { name: string; kra_pin: string; position: string; department: string; email: string; phone: string; address: string; date_of_birth: string; date_of_employment: string; employment_type: 'full-time' | 'part-time' | 'contract' | 'intern'; bank_name: string; bank_account_number: string; bank_branch: string; basic_salary: number; allowances: { housing: number; transport: number; medical: number; communication: number; meals: number; fuel: number; entertainment: number; }; helb_amount: number; voluntary_deductions: { insurance: number; pension: number; union_fees: number; loans: number; saccos: number; welfare: number; }; emergency_contact_name: string; emergency_contact_phone: string; emergency_contact_relationship: string; }
 
@@ -29,12 +30,75 @@ function AllowanceField({ label, value, onChange, placeholder = '0' }: { label: 
 
 function EmployeeForm() {
   const navigate = useNavigate()
+  const params = useParams()
+  const employeeId = params.id
+  const isEditMode = !!employeeId
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const { data: nextEmployeeId } = useNextEmployeeId()
   const [formData, setFormData] = useState<EmployeeFormData>(initialFormData)
+  const [currentEmployeeId, setCurrentEmployeeId] = useState<string>('')
+  const [isLoading, setIsLoading] = useState(isEditMode)
   const [isSaving, setIsSaving] = useState(false)
   const [errors, setErrors] = useState<Partial<Record<keyof EmployeeFormData, string>>>({})
+
+  // Load employee data when in edit mode
+  useEffect(() => {
+    if (isEditMode && employeeId) {
+      setIsLoading(true)
+      fetchEmployee(employeeId)
+        .then((employee: Employee) => {
+          setCurrentEmployeeId(employee.employee_id)
+          // Pre-fill form with existing employee data
+          setFormData({
+            name: employee.name || '',
+            kra_pin: employee.kra_pin || '',
+            position: employee.position || '',
+            department: '',
+            email: '',
+            phone: '',
+            address: '',
+            date_of_birth: '',
+            date_of_employment: '',
+            employment_type: 'full-time',
+            bank_name: '',
+            bank_account_number: '',
+            bank_branch: '',
+            basic_salary: employee.basic_salary || 0,
+            allowances: {
+              housing: (employee.allowances as any)?.housing || 0,
+              transport: (employee.allowances as any)?.transport || 0,
+              medical: (employee.allowances as any)?.medical || 0,
+              communication: (employee.allowances as any)?.communication || 0,
+              meals: (employee.allowances as any)?.meals || 0,
+              fuel: (employee.allowances as any)?.fuel || 0,
+              entertainment: (employee.allowances as any)?.entertainment || 0,
+            },
+            helb_amount: employee.helb_amount || 0,
+            voluntary_deductions: {
+              insurance: (employee.voluntary_deductions as any)?.insurance || 0,
+              pension: (employee.voluntary_deductions as any)?.pension || 0,
+              union_fees: (employee.voluntary_deductions as any)?.union_fees || 0,
+              loans: (employee.voluntary_deductions as any)?.loans || 0,
+              saccos: (employee.voluntary_deductions as any)?.saccos || 0,
+              welfare: (employee.voluntary_deductions as any)?.welfare || 0,
+            },
+            emergency_contact_name: '',
+            emergency_contact_phone: '',
+            emergency_contact_relationship: '',
+          })
+          setIsLoading(false)
+        })
+        .catch((error: any) => {
+          toast({ 
+            title: 'Error', 
+            description: error?.message || 'Failed to load employee data', 
+            variant: 'destructive' 
+          })
+          navigate('/employees')
+        })
+    }
+  }, [isEditMode, employeeId, navigate, toast])
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof EmployeeFormData, string>> = {}
@@ -59,21 +123,48 @@ function EmployeeForm() {
     if (!validateForm()) return
     setIsSaving(true)
     try {
-      const newEmployee = await createEmployee({
-        name: formData.name,
-        kra_pin: formData.kra_pin,
-        position: formData.position,
-        basic_salary: formData.basic_salary,
-        allowances: formData.allowances as any,
-        helb_amount: formData.helb_amount,
-        voluntary_deductions: formData.voluntary_deductions as any,
-        // optional fields can be saved in dedicated tables/JSON if schema supports
-      } as any)
+      if (isEditMode && employeeId) {
+        // Update existing employee
+        await updateEmployee(employeeId, {
+          name: formData.name,
+          kra_pin: formData.kra_pin,
+          position: formData.position,
+          basic_salary: formData.basic_salary,
+          allowances: formData.allowances as any,
+          helb_amount: formData.helb_amount,
+          voluntary_deductions: formData.voluntary_deductions as any,
+        } as any)
+        
+        toast({ 
+          title: 'Success!', 
+          description: 'Employee has been updated successfully.', 
+          className: 'bg-green-600 text-white border-green-700' 
+        })
+      } else {
+        // Create new employee
+        await createEmployee({
+          name: formData.name,
+          kra_pin: formData.kra_pin,
+          position: formData.position,
+          basic_salary: formData.basic_salary,
+          allowances: formData.allowances as any,
+          helb_amount: formData.helb_amount,
+          voluntary_deductions: formData.voluntary_deductions as any,
+        } as any)
+        
+        // Invalidate next employee ID only for new employees
+        queryClient.invalidateQueries({ queryKey: ['next-employee-id'] })
+        
+        toast({ 
+          title: 'Success!', 
+          description: 'Employee has been created successfully.', 
+          className: 'bg-green-600 text-white border-green-700' 
+        })
+      }
       
       // Invalidate queries first
       queryClient.invalidateQueries({ queryKey: ['employees'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-      queryClient.invalidateQueries({ queryKey: ['next-employee-id'] })
       
       // Wait for refetch to complete before navigating
       await Promise.all([
@@ -81,12 +172,14 @@ function EmployeeForm() {
         queryClient.refetchQueries({ queryKey: ['dashboard-stats'] }),
       ])
       
-      toast({ title: 'Success!', description: 'Employee has been saved successfully.', className: 'bg-green-600 text-white border-green-700' })
-      
       // Navigate immediately after refetch completes - list will be updated
       navigate('/employees')
     } catch (error: any) {
-      toast({ title: 'Error', description: error?.message || 'Failed to save employee. Please try again.', variant: 'destructive' })
+      toast({ 
+        title: 'Error', 
+        description: error?.message || `Failed to ${isEditMode ? 'update' : 'save'} employee. Please try again.`, 
+        variant: 'destructive' 
+      })
     } finally {
       setIsSaving(false)
     }
@@ -112,8 +205,17 @@ function EmployeeForm() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="employee_id">Employee ID</Label>
-              <Input id="employee_id" value={nextEmployeeId || 'Generating…'} readOnly placeholder="EMP001" />
-              <p className="text-xs text-muted-foreground">Auto-generated, sequential and uneditable.</p>
+              <Input 
+                id="employee_id" 
+                value={isEditMode ? currentEmployeeId : (nextEmployeeId || 'Generating…')} 
+                readOnly 
+                placeholder="EMP001" 
+              />
+              <p className="text-xs text-muted-foreground">
+                {isEditMode 
+                  ? 'Employee ID cannot be changed.' 
+                  : 'Auto-generated, sequential and uneditable.'}
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="kra_pin">KRA PIN *</Label>
@@ -216,23 +318,34 @@ function EmployeeForm() {
         </CardContent>
       </Card>
 
-      <div className="flex flex-col sm:flex-row gap-4 justify-end">
-        <Button variant="outline" onClick={() => navigate('/employees')} className="flex items-center gap-2"><ArrowLeft className="h-4 w-4" />Cancel</Button>
-        <Button onClick={handleSave} disabled={isSaving} className="kenya-gradient text-white hover:opacity-90 flex items-center gap-2"><Save className="h-4 w-4" />{isSaving ? 'Saving...' : 'Save Employee'}</Button>
-      </div>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <p className="text-muted-foreground">Loading employee data...</p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col sm:flex-row gap-4 justify-end">
+          <Button variant="outline" onClick={() => navigate('/employees')} className="flex items-center gap-2"><ArrowLeft className="h-4 w-4" />Cancel</Button>
+          <Button onClick={handleSave} disabled={isSaving} className="kenya-gradient text-white hover:opacity-90 flex items-center gap-2"><Save className="h-4 w-4" />{isSaving ? 'Saving...' : isEditMode ? 'Update Employee' : 'Save Employee'}</Button>
+        </div>
+      )}
     </div>
   )
 }
 
 const NewEmployee: React.FC = () => {
   const { shouldExpand } = useSidebar()
+  const params = useParams()
+  const isEditMode = !!params.id
+  
   return (
     <div className="min-h-screen bg-background w-full overflow-x-hidden">
       <div className="sm:hidden px-4 py-6 border-b bg-card/50">
         <div className="flex items-center justify-between min-w-0">
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-bold truncate">Add Employee</h1>
-            <p className="text-[12px] text-muted-foreground truncate">Register new team member</p>
+            <h1 className="text-lg font-bold truncate">{isEditMode ? 'Edit Employee' : 'Add Employee'}</h1>
+            <p className="text-[12px] text-muted-foreground truncate">{isEditMode ? 'Update employee information' : 'Register new team member'}</p>
           </div>
           <div className="kenya-gradient w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ml-2"><User className="h-5 w-5 text-white" /></div>
         </div>
@@ -240,8 +353,8 @@ const NewEmployee: React.FC = () => {
       <div className="hidden sm:block px-4 sm:px-6 py-6 border-b bg-card/50">
         <div className="flex items-center justify-between min-w-0">
           <div className="min-w-0 flex-1">
-            <h1 className={cn('font-bold transition-all duration-300', shouldExpand ? 'text-xl' : 'text-xl')}>Add New Employee</h1>
-            <p className={cn('text-muted-foreground transition-all duration-300 truncate', shouldExpand ? 'text-sm' : 'text-base')}>Register a new team member and configure their payroll details</p>
+            <h1 className={cn('font-bold transition-all duration-300', shouldExpand ? 'text-xl' : 'text-xl')}>{isEditMode ? 'Edit Employee' : 'Add New Employee'}</h1>
+            <p className={cn('text-muted-foreground transition-all duration-300 truncate', shouldExpand ? 'text-sm' : 'text-base')}>{isEditMode ? 'Update employee information and payroll details' : 'Register a new team member and configure their payroll details'}</p>
           </div>
           <div className="kenya-gradient w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ml-4"><User className="h-6 w-6 text-white" /></div>
         </div>

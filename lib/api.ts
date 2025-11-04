@@ -18,6 +18,27 @@ export async function createEmployee(payload: Partial<Employee>): Promise<Employ
   return json.data as Employee
 }
 
+export async function updateEmployee(id: string, payload: Partial<Employee>): Promise<Employee> {
+  const res = await fetch(`/api/employees/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}))
+    throw new Error(json.error || 'Failed to update employee')
+  }
+  const json = await res.json()
+  return json.data as Employee
+}
+
+export async function fetchEmployee(id: string): Promise<Employee> {
+  const res = await fetch(`/api/employees/${id}`)
+  if (!res.ok) throw new Error('Failed to fetch employee')
+  const json = await res.json()
+  return json.data as Employee
+}
+
 export async function deleteEmployee(id: string): Promise<void> {
   const res = await fetch(`/api/employees/${id}`, {
     method: 'DELETE',
