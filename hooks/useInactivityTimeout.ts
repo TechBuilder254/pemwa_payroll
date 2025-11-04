@@ -100,6 +100,33 @@ export function useInactivityTimeout({
       return
     }
 
+    // Check if user has been inactive too long when component mounts
+    // This handles cases where page was refreshed or reopened
+    const timeSinceLastActivity = Date.now() - lastActivityRef.current
+    const totalTimeout = inactivityTimeout + warningTimeout
+    
+    if (timeSinceLastActivity >= totalTimeout) {
+      // User has been inactive too long - logout immediately
+      console.log('[InactivityTimeout] User inactive too long on mount - logging out')
+      onLogout()
+      return
+    } else if (timeSinceLastActivity >= inactivityTimeout) {
+      // User has been inactive longer than timeout - show warning
+      console.log('[InactivityTimeout] User inactive on mount - showing warning')
+      warningShownRef.current = true
+      onWarning()
+      
+      const remainingWarningTime = totalTimeout - timeSinceLastActivity
+      if (remainingWarningTime > 0) {
+        warningTimerRef.current = setTimeout(() => {
+          onLogout()
+        }, remainingWarningTime)
+      } else {
+        onLogout()
+      }
+      return
+    }
+    
     // Initialize timer on mount
     resetTimers()
 
